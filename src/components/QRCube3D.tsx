@@ -160,9 +160,9 @@ function BackgroundSphere() {
 
 export default function QRCube3D() {
   return (
-    <div className="w-full h-96 relative overflow-hidden">
+    <div className="fixed inset-0 w-full h-full overflow-hidden">
       <Canvas
-        camera={{ position: [6, 4, 6], fov: 50 }}
+        camera={{ position: [6, 4, 6], fov: 60 }}
         shadows
         style={{ background: 'transparent' }}
         gl={{ antialias: true, alpha: true }}

@@ -22,7 +22,12 @@ export default function Home() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 relative">
+      {/* 3D Background - Full Page */}
+      <div className="fixed inset-0 z-0">
+        <QRCube3D />
+      </div>
+      
       {/* Minimal Header */}
       <motion.header 
         initial={{ y: -100, opacity: 0 }}
@@ -59,11 +64,6 @@ export default function Home() {
 
       {/* Hero Section with 3D Elements */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* 3D Background */}
-        <div className="absolute inset-0 opacity-40">
-          <QRCube3D />
-        </div>
-        
         {/* Gradient Overlays */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-transparent to-indigo-600/20"></div>
         <div className="absolute inset-0 bg-gradient-to-t from-white/50 via-transparent to-transparent"></div>
@@ -144,7 +144,7 @@ export default function Home() {
         whileInView={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
         viewport={{ once: true }}
-        className="py-16"
+        className="relative py-16 z-20 bg-white/70 backdrop-blur-sm"
       >
         <div className="max-w-7xl mx-auto px-6">
           <motion.div 
@@ -172,7 +172,7 @@ export default function Home() {
         whileInView={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
         viewport={{ once: true }}
-        className="py-8 border-t border-gray-200 bg-white/50 backdrop-blur-sm"
+        className="relative py-8 border-t border-gray-200 bg-white/70 backdrop-blur-sm z-20"
       >
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between">
