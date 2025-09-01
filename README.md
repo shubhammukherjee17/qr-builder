@@ -1,41 +1,38 @@
 # QR Builder
 
-A complete full-stack QR code generator application built with Next.js, TypeScript, and modern web technologies.
+A free, unlimited QR code generator built with Next.js, TypeScript, and modern web technologies. **No signups • No limits • 100% free forever!**
 
 ## Features
 
 ### 🎯 Core Features
 - **Multiple QR Code Types**: Text, URL, Email, Phone, SMS, WiFi, vCard
-- **Custom Styling**: Colors, sizes, margins, and logo embedding
-- **Real-time Preview**: See your QR code as you create it
-- **Download & Share**: Save QR codes in various formats
-
-### 👤 User Management
-- **Authentication**: Sign up and sign in functionality
-- **Personal Gallery**: Save and manage your QR codes
-- **Public Gallery**: Browse QR codes shared by the community
-- **Analytics**: Track scans and usage statistics
+- **Custom Styling**: Colors, sizes, margins with real-time preview
+- **Instant Generation**: Create QR codes instantly with no delays
+- **High Quality Downloads**: Save QR codes as PNG images
+- **No Registration Required**: Use immediately without creating an account
 
 ### 🎨 Design & UX
-- **Responsive Design**: Works on desktop, tablet, and mobile
-- **Modern UI**: Built with Tailwind CSS
-- **Dark/Light Support**: Adaptive color schemes
-- **Intuitive Interface**: Easy-to-use form controls
+- **Responsive Design**: Works perfectly on desktop, tablet, and mobile
+- **Modern UI**: Beautiful interface built with Tailwind CSS
+- **3D Interactive Elements**: Animated QR cube with Three.js
+- **Smooth Scrolling**: Enhanced user experience with Lenis
+- **Intuitive Interface**: Easy-to-use form controls and instant feedback
 
-### 🔧 Advanced Features
-- **Database Storage**: Cloud storage with Firebase Firestore
-- **RESTful API**: Clean API endpoints for all operations
-- **Type Safety**: Full TypeScript implementation
-- **Real-time Updates**: Live data synchronization with Firestore
+### ✨ Advanced Features
+- **Client-Side Generation**: All processing done locally for privacy
+- **Type Safety**: Full TypeScript implementation for reliability
+- **Optimized Performance**: Fast loading and smooth interactions
+- **Copy to Clipboard**: Easy sharing with one-click copy functionality
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
-- **Backend**: Next.js API Routes, Firebase Admin SDK
-- **Database**: Firebase Firestore (NoSQL)
-- **Authentication**: Firebase Authentication
+- **Frontend**: Next.js 15, React 19, TypeScript
+- **Styling**: Tailwind CSS 4
+- **3D Graphics**: Three.js with React Three Fiber
 - **QR Generation**: qrcode library
+- **Smooth Scrolling**: Lenis
 - **Icons**: Lucide React
+- **Build Tool**: Turbopack for fast builds
 
 ## Getting Started
 
@@ -45,38 +42,30 @@ A complete full-stack QR code generator application built with Next.js, TypeScri
 
 ### Installation
 
-1. **Install dependencies**
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd qr-builder
+   ```
+
+2. **Install dependencies**
    ```bash
    npm install
    ```
 
-2. **Set up Firebase**
-   Follow the detailed setup guide in `FIREBASE_SETUP.md`
-
-3. **Configure environment variables**
-   Update the `.env` file with your Firebase configuration:
-   ```
-   # Firebase Configuration (Client-side)
-   NEXT_PUBLIC_FIREBASE_API_KEY="your-api-key"
-   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="your-project.firebaseapp.com"
-   NEXT_PUBLIC_FIREBASE_PROJECT_ID="your-project-id"
-   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="your-project.appspot.com"
-   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="your-sender-id"
-   NEXT_PUBLIC_FIREBASE_APP_ID="your-app-id"
-   
-   # Firebase Admin SDK (Server-side)
-   FIREBASE_PROJECT_ID="your-project-id"
-   FIREBASE_CLIENT_EMAIL="your-service-account@your-project.iam.gserviceaccount.com"
-   FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nyour-private-key\n-----END PRIVATE KEY-----\n"
-   ```
-
-4. **Start the development server**
+3. **Start the development server**
    ```bash
    npm run dev
    ```
 
-5. **Open your browser**
+4. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
+
+5. **Build for production**
+   ```bash
+   npm run build
+   npm start
+   ```
 
 ## Usage
 
@@ -84,51 +73,38 @@ A complete full-stack QR code generator application built with Next.js, TypeScri
 
 1. **Choose QR Code Type**: Select from Text, URL, Email, Phone, SMS, WiFi, or vCard
 2. **Enter Data**: Fill in the required information for your chosen type
-3. **Customize Style**: Adjust colors, size, and margin
-4. **Generate**: Click "Generate QR Code" to create your QR code
-5. **Download**: Save the QR code as a PNG image
+3. **Customize Style**: Adjust colors, size, and margin with live preview
+4. **Generate**: Click "Generate QR Code" to create your QR code instantly
+5. **Download**: Save the QR code as a high-quality PNG image
+6. **Copy**: Copy the QR code image to your clipboard for easy sharing
 
-### Managing QR Codes
+### Key Benefits
 
-- **Sign Up**: Create an account to save your QR codes
-- **Gallery**: View all your created QR codes
-- **Analytics**: Track how many times your QR codes have been scanned
-- **Public Sharing**: Make your QR codes public for others to see
+- **No Registration**: Start creating QR codes immediately
+- **Unlimited Usage**: Generate as many QR codes as you need
+- **Privacy First**: All processing happens in your browser
+- **Always Free**: No hidden costs or premium features
+- **Works Offline**: Generate QR codes even without internet (after initial load)
 
-## API Endpoints
-
-### QR Codes
-- `POST /api/qr/generate` - Generate and save QR code
-- `GET /api/qr/generate` - Get user's QR codes or public QR codes
-- `GET /api/qr/[id]` - Get specific QR code details
-- `DELETE /api/qr/[id]` - Delete QR code
-- `POST /api/qr/[id]/scan` - Record QR code scan
-- `GET /api/qr/[id]/scan` - Get QR code analytics
 
 ## Project Structure
 
 ```
 src/
 ├── app/                 # Next.js app directory
-│   ├── api/qr/         # QR code API routes
-│   ├── gallery/        # Gallery page
-│   └── page.tsx        # Home page
+│   ├── globals.css     # Global styles with custom animations
+│   ├── layout.tsx      # App layout
+│   └── page.tsx        # Home page with hero and QR builder
 ├── components/         # React components
-│   ├── AuthModal.tsx   # Authentication modal
-│   ├── QRBuilder.tsx   # Main QR builder
-│   ├── QRGallery.tsx   # QR code gallery
-│   └── QRScanner.tsx   # QR code scanner
-├── contexts/           # React contexts
-│   └── AuthContext.tsx # Firebase authentication context
+│   ├── QRBuilder.tsx   # Main QR code generator
+│   └── QRCube3D.tsx    # 3D animated QR cube
+├── hooks/             # Custom React hooks
+│   └── useSmoothScroll.tsx # Smooth scrolling with Lenis
 ├── lib/               # Utility libraries
-│   ├── firebase.ts     # Firebase client config
-│   ├── firebase-admin.ts # Firebase admin config
-│   └── qr-utils.ts    # QR code utilities
-├── services/          # Business logic
-│   └── firestore.ts   # Firestore operations
+│   └── qr-utils.ts    # QR code generation utilities
 ├── types/             # TypeScript definitions
 │   └── index.ts       # App-wide type definitions
-└── FIREBASE_SETUP.md  # Firebase setup guide
+└── README.md          # Project documentation
 ```
 
 ## License
@@ -137,11 +113,13 @@ This project is licensed under the MIT License.
 
 ## Acknowledgments
 
-- [Next.js](https://nextjs.org/) - React framework
-- [Firebase](https://firebase.google.com/) - Backend platform and database
-- [Tailwind CSS](https://tailwindcss.com/) - CSS framework
-- [Lucide React](https://lucide.dev/) - Icons
+- [Next.js](https://nextjs.org/) - React framework with Turbopack
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [Three.js](https://threejs.org/) - 3D graphics library
+- [React Three Fiber](https://docs.pmnd.rs/react-three-fiber) - React renderer for Three.js
+- [Lucide React](https://lucide.dev/) - Beautiful icon library
 - [QRCode](https://github.com/soldair/node-qrcode) - QR code generation
+- [Lenis](https://lenis.studiofreight.com/) - Smooth scrolling library
 
 ---
 

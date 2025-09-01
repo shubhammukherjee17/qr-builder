@@ -2,8 +2,10 @@
 
 import { useState, useRef } from 'react'
 import { QRType, QRCodeStyle } from '@/types'
-import { Download, Copy, RefreshCw } from 'lucide-react'
+import { Download, Copy, RefreshCw, Check, ChevronDown } from 'lucide-react'
 import QRCode from 'qrcode'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useInView } from 'framer-motion'
 
 const QR_TYPES = [
   { value: QRType.TEXT, label: 'Text' },
@@ -104,6 +106,17 @@ export default function QRBuilder() {
         // Convert canvas to data URL
         const dataUrl = canvas.toDataURL('image/png')
         setQrImageUrl(dataUrl)
+        
+        // Scroll to preview section after a short delay to allow the image to render
+        setTimeout(() => {
+          const previewSection = document.querySelector('[data-qr-preview]')
+          if (previewSection) {
+            previewSection.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            })
+          }
+        }, 200)
       }
     } catch (error) {
       console.error('Error generating QR code:', error)
@@ -148,15 +161,18 @@ export default function QRBuilder() {
   }
 
   const renderDataForm = () => {
+    const inputClassName = "w-full p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
+    const labelClassName = "block text-sm font-medium text-gray-700 mb-2"
+
     switch (selectedType) {
       case QRType.TEXT:
         return (
           <div>
-            <label className="block text-sm font-medium mb-2">Text Content</label>
+            <label className={labelClassName}>Text Content</label>
             <textarea
-              className="w-full p-2 border rounded-md resize-none"
-              rows={3}
-              placeholder="Enter your text here"
+              className={`${inputClassName} resize-none`}
+              rows={4}
+              placeholder="Enter your text here..."
               value={String(qrData.text || '')}
               onChange={(e) => handleDataChange('text', e.target.value)}
             />
@@ -166,10 +182,10 @@ export default function QRBuilder() {
       case QRType.URL:
         return (
           <div>
-            <label className="block text-sm font-medium mb-2">Website URL</label>
+            <label className={labelClassName}>Website URL</label>
             <input
               type="url"
-              className="w-full p-2 border rounded-md"
+              className={inputClassName}
               placeholder="https://example.com"
               value={String(qrData.url || '')}
               onChange={(e) => handleDataChange('url', e.target.value)}
@@ -181,29 +197,29 @@ export default function QRBuilder() {
         return (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Email Address</label>
+              <label className={labelClassName}>Email Address</label>
               <input
                 type="email"
-                className="w-full p-2 border rounded-md"
+                className={inputClassName}
                 placeholder="example@email.com"
                 value={String(qrData.email || '')}
                 onChange={(e) => handleDataChange('email', e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Subject (Optional)</label>
+              <label className={labelClassName}>Subject (Optional)</label>
               <input
                 type="text"
-                className="w-full p-2 border rounded-md"
+                className={inputClassName}
                 placeholder="Email subject"
                 value={String(qrData.subject || '')}
                 onChange={(e) => handleDataChange('subject', e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Message (Optional)</label>
+              <label className={labelClassName}>Message (Optional)</label>
               <textarea
-                className="w-full p-2 border rounded-md resize-none"
+                className={`${inputClassName} resize-none`}
                 rows={3}
                 placeholder="Email message"
                 value={String(qrData.body || '')}
@@ -216,11 +232,11 @@ export default function QRBuilder() {
       case QRType.PHONE:
         return (
           <div>
-            <label className="block text-sm font-medium mb-2">Phone Number</label>
+            <label className={labelClassName}>Phone Number</label>
             <input
               type="tel"
-              className="w-full p-2 border rounded-md"
-              placeholder="+1234567890"
+              className={inputClassName}
+              placeholder="+1 234 567 8900"
               value={String(qrData.phone || '')}
               onChange={(e) => handleDataChange('phone', e.target.value)}
             />
@@ -231,19 +247,19 @@ export default function QRBuilder() {
         return (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Phone Number</label>
+              <label className={labelClassName}>Phone Number</label>
               <input
                 type="tel"
-                className="w-full p-2 border rounded-md"
-                placeholder="+1234567890"
+                className={inputClassName}
+                placeholder="+1 234 567 8900"
                 value={String(qrData.phone || '')}
                 onChange={(e) => handleDataChange('phone', e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Message</label>
+              <label className={labelClassName}>Message</label>
               <textarea
-                className="w-full p-2 border rounded-md resize-none"
+                className={`${inputClassName} resize-none`}
                 rows={3}
                 placeholder="SMS message"
                 value={String(qrData.message || '')}
@@ -257,46 +273,49 @@ export default function QRBuilder() {
         return (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Network Name (SSID)</label>
+              <label className={labelClassName}>Network Name (SSID)</label>
               <input
                 type="text"
-                className="w-full p-2 border rounded-md"
-                placeholder="WiFi Network Name"
+                className={inputClassName}
+                placeholder="My WiFi Network"
                 value={String(qrData.ssid || '')}
                 onChange={(e) => handleDataChange('ssid', e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Password</label>
+              <label className={labelClassName}>Password</label>
               <input
                 type="password"
-                className="w-full p-2 border rounded-md"
+                className={inputClassName}
                 placeholder="WiFi Password"
                 value={String(qrData.password || '')}
                 onChange={(e) => handleDataChange('password', e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Security Type</label>
-              <select
-                className="w-full p-2 border rounded-md"
-                value={String(qrData.security || 'WPA')}
-                onChange={(e) => handleDataChange('security', e.target.value)}
-              >
-                <option value="WPA">WPA/WPA2</option>
-                <option value="WEP">WEP</option>
-                <option value="nopass">Open Network</option>
-              </select>
+              <label className={labelClassName}>Security Type</label>
+              <div className="relative">
+                <select
+                  className={`${inputClassName} appearance-none`}
+                  value={String(qrData.security || 'WPA')}
+                  onChange={(e) => handleDataChange('security', e.target.value)}
+                >
+                  <option value="WPA">WPA/WPA2</option>
+                  <option value="WEP">WEP</option>
+                  <option value="nopass">Open Network</option>
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center mt-4">
               <input
                 type="checkbox"
                 id="hidden"
-                className="mr-2"
+                className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 checked={Boolean(qrData.hidden)}
                 onChange={(e) => handleDataChange('hidden', e.target.checked)}
               />
-              <label htmlFor="hidden" className="text-sm">Hidden Network</label>
+              <label htmlFor="hidden" className="text-sm text-gray-700">Hidden Network</label>
             </div>
           </div>
         )
@@ -305,59 +324,61 @@ export default function QRBuilder() {
         return (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Full Name</label>
+              <label className={labelClassName}>Full Name</label>
               <input
                 type="text"
-                className="w-full p-2 border rounded-md"
+                className={inputClassName}
                 placeholder="John Doe"
                 value={String(qrData.name || '')}
                 onChange={(e) => handleDataChange('name', e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Organization</label>
+              <label className={labelClassName}>Organization</label>
               <input
                 type="text"
-                className="w-full p-2 border rounded-md"
+                className={inputClassName}
                 placeholder="Company Name"
                 value={String(qrData.organization || '')}
                 onChange={(e) => handleDataChange('organization', e.target.value)}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Phone</label>
-              <input
-                type="tel"
-                className="w-full p-2 border rounded-md"
-                placeholder="+1234567890"
-                value={String(qrData.phone || '')}
-                onChange={(e) => handleDataChange('phone', e.target.value)}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClassName}>Phone</label>
+                <input
+                  type="tel"
+                  className={inputClassName}
+                  placeholder="+1 234 567 8900"
+                  value={String(qrData.phone || '')}
+                  onChange={(e) => handleDataChange('phone', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelClassName}>Email</label>
+                <input
+                  type="email"
+                  className={inputClassName}
+                  placeholder="john@example.com"
+                  value={String(qrData.email || '')}
+                  onChange={(e) => handleDataChange('email', e.target.value)}
+                />
+              </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Email</label>
-              <input
-                type="email"
-                className="w-full p-2 border rounded-md"
-                placeholder="john@example.com"
-                value={String(qrData.email || '')}
-                onChange={(e) => handleDataChange('email', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Website</label>
+              <label className={labelClassName}>Website</label>
               <input
                 type="url"
-                className="w-full p-2 border rounded-md"
+                className={inputClassName}
                 placeholder="https://example.com"
                 value={String(qrData.website || '')}
                 onChange={(e) => handleDataChange('website', e.target.value)}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Notes</label>
+              <label className={labelClassName}>Notes</label>
               <textarea
-                className="w-full p-2 border rounded-md resize-none"
+                className={`${inputClassName} resize-none`}
                 rows={2}
                 placeholder="Additional notes"
                 value={String(qrData.note || '')}
@@ -373,168 +394,226 @@ export default function QRBuilder() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* QR Builder Form */}
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Create QR Code</h2>
-            
-            {/* QR Type Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">QR Code Type</label>
-              <select
-                className="w-full p-2 border rounded-md"
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value as QRType)}
-              >
-                {QR_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      className="max-w-5xl mx-auto"
+    >
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        {/* QR Builder Form - Left Side */}
+        <motion.div 
+          initial={{ opacity: 0, x: -30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="lg:col-span-2 space-y-6"
+        >
+          {/* QR Type Selection */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
+            <div className="relative">
+              <label className="block text-sm font-medium text-gray-700 mb-3">QR Type</label>
+              <div className="relative">
+                <select
+                  className="w-full p-4 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value as QRType)}
+                >
+                  {QR_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
+          </div>
 
-            {/* Data Input Form */}
-            <div className="mb-6">
+          {/* Data Input Form */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={selectedType}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50"
+            >
               {renderDataForm()}
-            </div>
+            </motion.div>
+          </AnimatePresence>
 
-
-            {/* Customization */}
-            <div className="border-t pt-6 mt-6">
-              <h3 className="text-lg font-semibold mb-4">Customization</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Foreground Color</label>
-                  <input
-                    type="color"
-                    className="w-full h-10 border rounded-md"
-                    value={style.foregroundColor}
-                    onChange={(e) => handleStyleChange('foregroundColor', e.target.value)}
-                  />
+          {/* Customization */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
+            <h3 className="text-sm font-medium text-gray-700 mb-4">Style</h3>
+            <div className="space-y-4">
+              <div className="flex space-x-4">
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-2">Foreground</label>
+                  <div className="relative">
+                    <input
+                      type="color"
+                      className="w-full h-12 border-2 border-gray-200 rounded-2xl cursor-pointer"
+                      value={style.foregroundColor}
+                      onChange={(e) => handleStyleChange('foregroundColor', e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Background Color</label>
+                <div className="flex-1">
+                  <label className="block text-xs text-gray-600 mb-2">Background</label>
                   <input
                     type="color"
-                    className="w-full h-10 border rounded-md"
+                    className="w-full h-12 border-2 border-gray-200 rounded-2xl cursor-pointer"
                     value={style.backgroundColor}
                     onChange={(e) => handleStyleChange('backgroundColor', e.target.value)}
                   />
                 </div>
+              </div>
+              
+              <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Size (px)</label>
+                  <label className="block text-xs text-gray-600 mb-2">Size: {style.size}px</label>
                   <input
                     type="range"
                     min="128"
                     max="512"
                     step="8"
-                    className="w-full"
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                     value={style.size}
                     onChange={(e) => handleStyleChange('size', parseInt(e.target.value))}
                   />
-                  <span className="text-xs text-gray-500">{style.size}px</span>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Margin</label>
+                  <label className="block text-xs text-gray-600 mb-2">Margin: {style.margin}</label>
                   <input
                     type="range"
                     min="0"
                     max="10"
                     step="1"
-                    className="w-full"
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                     value={style.margin}
                     onChange={(e) => handleStyleChange('margin', parseInt(e.target.value))}
                   />
-                  <span className="text-xs text-gray-500">{style.margin}</span>
                 </div>
               </div>
             </div>
-
-            {/* Generate Button */}
-            <button
-              onClick={generateQR}
-              disabled={isGenerating}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-            >
-              {isGenerating ? (
-                <>
-                  <RefreshCw size={16} className="animate-spin" />
-                  <span>Generating...</span>
-                </>
-              ) : (
-                <span>Generate QR Code</span>
-              )}
-            </button>
           </div>
-        </div>
 
-        {/* QR Code Preview */}
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Preview</h2>
-            
-            {qrImageUrl ? (
-              <div className="text-center">
-                <div className="inline-block p-6 bg-white border rounded-xl shadow-sm">
-                  <img 
-                    src={qrImageUrl}
-                    alt="Generated QR Code"
-                    className="mx-auto rounded-lg"
-                    style={{ width: style.size, height: style.size }}
-                  />
-                </div>
-                
-                <div className="flex justify-center space-x-4 mt-6">
-                  <button
-                    onClick={downloadQR}
-                    className="flex items-center space-x-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-                  >
-                    <Download size={18} />
-                    <span>Download PNG</span>
-                  </button>
-                  
-                  <button
-                    onClick={copyQRData}
-                    className="flex items-center space-x-2 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-                  >
-                    <Copy size={18} />
-                    <span>Copy Image</span>
-                  </button>
-                </div>
-                
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg text-left">
-                  <h4 className="font-medium text-gray-900 mb-2">QR Code Details</h4>
-                  <p className="text-sm text-gray-600 mb-1">
-                    <strong>Type:</strong> {selectedType}
-                  </p>
-                  <p className="text-sm text-gray-600 mb-1">
-                    <strong>Content:</strong> {formatQRContent().substring(0, 100)}{formatQRContent().length > 100 ? '...' : ''}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    <strong>Size:</strong> {style.size} x {style.size} pixels
-                  </p>
-                </div>
-              </div>
+          {/* Generate Button */}
+          <motion.button
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={generateQR}
+            disabled={isGenerating}
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-4 px-6 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all duration-200"
+          >
+            {isGenerating ? (
+              <>
+                <RefreshCw size={20} className="animate-spin" />
+                <span>Generating...</span>
+              </>
             ) : (
-              <div className="text-center py-16 text-gray-500">
-                <div className="w-64 h-64 mx-auto border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-6xl mb-4">📱</div>
-                    <p className="text-lg font-medium text-gray-600">QR Code will appear here</p>
-                    <p className="text-sm text-gray-500 mt-2">Fill in the details and click Generate</p>
+              <span>Generate QR Code</span>
+            )}
+          </motion.button>
+        </motion.div>
+
+        {/* QR Code Preview - Right Side */}
+        <motion.div 
+          initial={{ opacity: 0, x: 30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="lg:col-span-3" 
+          data-qr-preview
+        >
+          <div className="sticky top-24">
+            {qrImageUrl ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, type: "spring", bounce: 0.3 }}
+                className="text-center"
+              >
+                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-2xl border border-gray-200/50">
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ duration: 0.2 }}
+                    className="inline-block p-4 bg-white rounded-2xl shadow-lg"
+                  >
+                    <img 
+                      src={qrImageUrl}
+                      alt="Generated QR Code"
+                      className="mx-auto rounded-xl"
+                      style={{ width: style.size, height: style.size }}
+                    />
+                  </motion.div>
+                  
+                  <div className="flex justify-center space-x-4 mt-8">
+                    <motion.button
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={downloadQR}
+                      className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-2xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+                    >
+                      <Download size={18} />
+                      <span>Download</span>
+                    </motion.button>
+                    
+                    <motion.button
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={copyQRData}
+                      className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-gray-600 to-slate-600 hover:from-gray-700 hover:to-slate-700 text-white rounded-2xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+                    >
+                      <Copy size={18} />
+                      <span>Copy</span>
+                    </motion.button>
                   </div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="mt-6 p-4 bg-gray-50/80 backdrop-blur-sm rounded-2xl text-left border border-gray-200/50"
+                  >
+                    <h4 className="font-medium text-gray-800 mb-3 flex items-center">
+                      <Check className="h-4 w-4 text-green-600 mr-2" />
+                      QR Code Details
+                    </h4>
+                    <div className="space-y-1 text-sm text-gray-600">
+                      <p><span className="font-medium">Type:</span> {selectedType}</p>
+                      <p><span className="font-medium">Size:</span> {style.size} × {style.size}px</p>
+                      <p><span className="font-medium">Content:</span> {formatQRContent().substring(0, 40)}{formatQRContent().length > 40 ? '...' : ''}</p>
+                    </div>
+                  </motion.div>
                 </div>
-              </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center"
+              >
+                <div className="bg-white/50 backdrop-blur-sm rounded-3xl p-16 border-2 border-dashed border-gray-300">
+                  <motion.div
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    className="text-8xl mb-6"
+                  >
+                    📱
+                  </motion.div>
+                  <h3 className="text-2xl font-semibold text-gray-700 mb-2">QR Code Preview</h3>
+                  <p className="text-gray-500">Fill in the details and generate your QR code</p>
+                </div>
+              </motion.div>
             )}
           </div>
-        </div>
+        </motion.div>
       </div>
       
       {/* Hidden canvas for QR generation */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
-    </div>
+    </motion.div>
   )
 }
