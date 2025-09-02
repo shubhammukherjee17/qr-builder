@@ -61,9 +61,17 @@ function QRCube() {
       </mesh>
       
       {/* Energy particles */}
-      {Array.from({ length: 12 }).map((_, i) => (
+      {Array.from({ length: 15 }).map((_, i) => (
         <EnergyParticle key={i} index={i} />
       ))}
+      
+      {/* Floating geometric shapes */}
+      <FloatingGeometry index={0} type="cube" />
+      <FloatingGeometry index={1} type="sphere" />
+      <FloatingGeometry index={2} type="torus" />
+      <FloatingGeometry index={3} type="octahedron" />
+      <FloatingGeometry index={4} type="cube" />
+      <FloatingGeometry index={5} type="sphere" />
     </group>
   )
 }
@@ -144,6 +152,93 @@ function EnergyParticle({ index }: { index: number }) {
   )
 }
 
+function FloatingGeometry({ index, type }: { index: number; type: 'cube' | 'sphere' | 'torus' | 'octahedron' }) {
+  const meshRef = useRef<Mesh>(null)
+  
+  useFrame((state) => {
+    if (meshRef.current) {
+      const time = state.clock.elapsedTime
+      const radius = 8 + Math.sin(time + index) * 2
+      const speed = 0.2 + index * 0.05
+      
+      meshRef.current.position.x = Math.cos(time * speed + index) * radius
+      meshRef.current.position.y = Math.sin(time * speed * 0.5 + index * 2) * 3
+      meshRef.current.position.z = Math.sin(time * speed + index * 1.5) * radius
+      
+      meshRef.current.rotation.x = time * 0.3 + index
+      meshRef.current.rotation.y = time * 0.2 + index * 0.5
+      meshRef.current.rotation.z = time * 0.1 + index * 0.3
+    }
+  })
+
+  const getGeometry = () => {
+    switch (type) {
+      case 'cube':
+        return <boxGeometry args={[0.5, 0.5, 0.5]} />
+      case 'sphere':
+        return <sphereGeometry args={[0.3, 16, 16]} />
+      case 'torus':
+        return <torusGeometry args={[0.3, 0.1, 8, 16]} />
+      case 'octahedron':
+        return <octahedronGeometry args={[0.4]} />
+    }
+  }
+
+  return (
+    <Float speed={1.5} rotationIntensity={1} floatIntensity={0.5}>
+      <mesh ref={meshRef} scale={0.8}>
+        {getGeometry()}
+        <meshPhysicalMaterial 
+          color={`hsl(${180 + index * 40}, 70%, 60%)`}
+          metalness={0.8}
+          roughness={0.2}
+          transmission={0.2}
+          transparent
+          opacity={0.6}
+        />
+      </mesh>
+    </Float>
+  )
+}
+
+function DataStreams() {
+  return (
+    <>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <DataStream key={i} index={i} />
+      ))}
+    </>
+  )
+}
+
+function DataStream({ index }: { index: number }) {
+  const points = []
+  for (let i = 0; i < 50; i++) {
+    const angle = (i / 50) * Math.PI * 4 + index
+    const radius = 6 + Math.sin(i * 0.1) * 2
+    points.push(
+      new THREE.Vector3(
+        Math.cos(angle) * radius,
+        i * 0.2 - 5,
+        Math.sin(angle) * radius
+      )
+    )
+  }
+  
+  const curve = new THREE.CatmullRomCurve3(points)
+  const tubeGeometry = new THREE.TubeGeometry(curve, 50, 0.02, 8, false)
+  
+  return (
+    <mesh geometry={tubeGeometry}>
+      <meshBasicMaterial 
+        color={`hsl(${240 + index * 30}, 80%, 70%)`}
+        transparent
+        opacity={0.6}
+      />
+    </mesh>
+  )
+}
+
 function BackgroundSphere() {
   return (
     <Sphere args={[15, 32, 32]} position={[0, 0, -10]}>
@@ -191,6 +286,7 @@ export default function QRCube3D() {
         <Environment preset="city" />
         
         <BackgroundSphere />
+        <DataStreams />
         <QRCube />
         
         <OrbitControls 

@@ -7,6 +7,11 @@ const defaultStyle: QRCodeStyle = {
   backgroundColor: '#ffffff',
   size: 256,
   margin: 4,
+  errorCorrectionLevel: 'M',
+  dotStyle: 'square',
+  cornerStyle: 'square',
+  gradientType: 'none',
+  pattern: 'default',
 }
 
 export async function generateQRCode(data: QRCodeData): Promise<string> {

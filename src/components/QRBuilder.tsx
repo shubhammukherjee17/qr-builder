@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { QRType, QRCodeStyle } from '@/types'
 import { Download, Copy, RefreshCw, Check, ChevronDown } from 'lucide-react'
 import QRCode from 'qrcode'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useInView } from 'framer-motion'
+import { dbOperations, type QRCodeRecord, supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 
 const QR_TYPES = [
   { value: QRType.TEXT, label: 'Text' },
@@ -18,6 +19,7 @@ const QR_TYPES = [
 ]
 
 export default function QRBuilder() {
+  const { user } = useAuth()
   const [selectedType, setSelectedType] = useState<QRType>(QRType.TEXT)
   const [qrData, setQrData] = useState<Record<string, string | boolean>>({})
   const [style, setStyle] = useState<QRCodeStyle>({
@@ -25,9 +27,15 @@ export default function QRBuilder() {
     backgroundColor: '#ffffff',
     size: 256,
     margin: 4,
+    errorCorrectionLevel: 'M',
+    dotStyle: 'square',
+    cornerStyle: 'square',
+    gradientType: 'none',
+    pattern: 'default',
   })
   const [qrImageUrl, setQrImageUrl] = useState<string>('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [recentQRCodes, setRecentQRCodes] = useState<QRCodeRecord[]>([])
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const handleDataChange = (key: string, value: string | boolean) => {
@@ -81,6 +89,21 @@ export default function QRBuilder() {
     }
   }
 
+  const fetchRecent = useCallback(async () => {
+    try {
+      // Only fetch user-specific QR codes if authenticated, otherwise get public ones
+      const userId = user?.id
+      const list = await dbOperations.getQRCodes(6, 0, userId)
+      setRecentQRCodes(list || [])
+    } catch (e) {
+      console.warn('Failed to fetch recent QRs:', e)
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    fetchRecent()
+  }, [user, fetchRecent])
+
   const generateQR = async () => {
     const content = formatQRContent()
     if (!content.trim()) {
@@ -100,12 +123,29 @@ export default function QRBuilder() {
             dark: style.foregroundColor,
             light: style.backgroundColor
           },
-          errorCorrectionLevel: 'M'
+          errorCorrectionLevel: style.errorCorrectionLevel
         })
         
         // Convert canvas to data URL
         const dataUrl = canvas.toDataURL('image/png')
         setQrImageUrl(dataUrl)
+
+        // Persist to database (Supabase) if configured and user is authenticated
+        if (supabase) {
+          try {
+            await dbOperations.createQRCode({
+              type: selectedType,
+              content,
+              data: qrData as Record<string, unknown>,
+              style: style as unknown as Record<string, unknown>,
+              image_url: dataUrl,
+            }, user?.id) // Pass user ID if authenticated
+            // Refresh recent list
+            fetchRecent()
+          } catch (e) {
+            console.warn('Failed to save QR to database:', e)
+          }
+        }
         
         // Scroll to preview section after a short delay to allow the image to render
         setTimeout(() => {
@@ -398,16 +438,16 @@ export default function QRBuilder() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      className="max-w-5xl mx-auto"
+      className="w-full"
     >
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* QR Builder Form - Left Side */}
         <motion.div 
           initial={{ opacity: 0, x: -30 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="lg:col-span-2 space-y-6"
+          className="lg:col-span-4 space-y-6"
         >
           {/* QR Type Selection */}
           <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
@@ -444,21 +484,19 @@ export default function QRBuilder() {
             </motion.div>
           </AnimatePresence>
 
-          {/* Customization */}
+          {/* Customization - Colors */}
           <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
-            <h3 className="text-sm font-medium text-gray-700 mb-4">Style</h3>
+            <h3 className="text-sm font-medium text-gray-700 mb-4">Colors & Gradients</h3>
             <div className="space-y-4">
               <div className="flex space-x-4">
                 <div className="flex-1">
                   <label className="block text-xs text-gray-600 mb-2">Foreground</label>
-                  <div className="relative">
-                    <input
-                      type="color"
-                      className="w-full h-12 border-2 border-gray-200 rounded-2xl cursor-pointer"
-                      value={style.foregroundColor}
-                      onChange={(e) => handleStyleChange('foregroundColor', e.target.value)}
-                    />
-                  </div>
+                  <input
+                    type="color"
+                    className="w-full h-12 border-2 border-gray-200 rounded-2xl cursor-pointer"
+                    value={style.foregroundColor}
+                    onChange={(e) => handleStyleChange('foregroundColor', e.target.value)}
+                  />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs text-gray-600 mb-2">Background</label>
@@ -469,6 +507,128 @@ export default function QRBuilder() {
                     onChange={(e) => handleStyleChange('backgroundColor', e.target.value)}
                   />
                 </div>
+              </div>
+              
+              <div>
+                <label className="block text-xs text-gray-600 mb-2">Gradient Type</label>
+                <div className="relative">
+                  <select
+                    className="w-full p-3 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    value={style.gradientType}
+                    onChange={(e) => handleStyleChange('gradientType', e.target.value)}
+                  >
+                    <option value="none">Solid Color</option>
+                    <option value="linear">Linear Gradient</option>
+                    <option value="radial">Radial Gradient</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+              
+              {style.gradientType !== 'none' && (
+                <div>
+                  <label className="block text-xs text-gray-600 mb-2">Gradient Color</label>
+                  <input
+                    type="color"
+                    className="w-full h-12 border-2 border-gray-200 rounded-2xl cursor-pointer"
+                    value={style.gradientColor || '#3b82f6'}
+                    onChange={(e) => handleStyleChange('gradientColor', e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Customization - Shape & Pattern */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
+            <h3 className="text-sm font-medium text-gray-700 mb-4">Shape & Pattern</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-2">Dot Style</label>
+                  <div className="relative">
+                    <select
+                      className="w-full p-3 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
+                      value={style.dotStyle}
+                      onChange={(e) => handleStyleChange('dotStyle', e.target.value)}
+                    >
+                      <option value="square">Square</option>
+                      <option value="rounded">Rounded</option>
+                      <option value="dots">Dots</option>
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-xs text-gray-600 mb-2">Corner Style</label>
+                  <div className="relative">
+                    <select
+                      className="w-full p-3 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
+                      value={style.cornerStyle}
+                      onChange={(e) => handleStyleChange('cornerStyle', e.target.value)}
+                    >
+                      <option value="square">Square</option>
+                      <option value="rounded">Rounded</option>
+                      <option value="extra-rounded">Extra Rounded</option>
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-xs text-gray-600 mb-2">Pattern Style</label>
+                <div className="relative">
+                  <select
+                    className="w-full p-3 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    value={style.pattern}
+                    onChange={(e) => handleStyleChange('pattern', e.target.value)}
+                  >
+                    <option value="default">Default</option>
+                    <option value="dots">Dots</option>
+                    <option value="squares">Squares</option>
+                    <option value="rounded">Rounded</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-xs text-gray-600 mb-2">Corner Radius: {style.cornerRadius || 0}px</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="20"
+                  step="1"
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                  value={style.cornerRadius || 0}
+                  onChange={(e) => handleStyleChange('cornerRadius', parseInt(e.target.value))}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Customization - Size & Quality */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
+            <h3 className="text-sm font-medium text-gray-700 mb-4">Size & Quality</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-2">Error Correction</label>
+                <div className="relative">
+                  <select
+                    className="w-full p-3 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    value={style.errorCorrectionLevel}
+                    onChange={(e) => handleStyleChange('errorCorrectionLevel', e.target.value)}
+                  >
+                    <option value="L">Low (7%)</option>
+                    <option value="M">Medium (15%)</option>
+                    <option value="Q">Quartile (25%)</option>
+                    <option value="H">High (30%)</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Higher levels can recover from more damage but create denser codes</p>
               </div>
               
               <div className="space-y-3">
@@ -500,6 +660,39 @@ export default function QRBuilder() {
             </div>
           </div>
 
+          {/* Logo Upload */}
+          <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
+            <h3 className="text-sm font-medium text-gray-700 mb-4">Logo (Optional)</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-2">Logo URL</label>
+                <input
+                  type="url"
+                  className="w-full p-3 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 placeholder-gray-400 text-sm"
+                  placeholder="https://example.com/logo.png"
+                  value={style.logoUrl || ''}
+                  onChange={(e) => handleStyleChange('logoUrl', e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">Add a logo to the center of your QR code</p>
+              </div>
+              
+              {style.logoUrl && (
+                <div>
+                  <label className="block text-xs text-gray-600 mb-2">Logo Size: {style.logoSize || 40}px</label>
+                  <input
+                    type="range"
+                    min="20"
+                    max="80"
+                    step="5"
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                    value={style.logoSize || 40}
+                    onChange={(e) => handleStyleChange('logoSize', parseInt(e.target.value))}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Generate Button */}
           <motion.button
             whileHover={{ scale: 1.02, y: -2 }}
@@ -519,12 +712,12 @@ export default function QRBuilder() {
           </motion.button>
         </motion.div>
 
-        {/* QR Code Preview - Right Side */}
+        {/* QR Code Preview - Center */}
         <motion.div 
-          initial={{ opacity: 0, x: 30 }}
-          animate={{ opacity: 1, x: 0 }}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="lg:col-span-3" 
+          className="lg:col-span-4" 
           data-qr-preview
         >
           <div className="sticky top-24">
@@ -608,6 +801,269 @@ export default function QRBuilder() {
                 </div>
               </motion.div>
             )}
+          </div>
+        </motion.div>
+
+        {/* Right Sidebar - Advanced Features */}
+        <motion.div 
+          initial={{ opacity: 0, x: 30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, delay: 0.6 }}
+          className="lg:col-span-4 space-y-6"
+        >
+          <div className="sticky top-24 space-y-6">
+            {/* QR History */}
+            <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
+              <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center">
+                <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                Recent QR Codes
+              </h3>
+            <div className="space-y-3">
+              {recentQRCodes.length === 0 && (
+                <p className="text-xs text-gray-500">No recent QR codes yet.</p>
+              )}
+              {recentQRCodes.map((qr) => (
+                <div key={qr.id} className="flex items-center justify-between p-3 bg-gray-50/50 rounded-2xl hover:bg-gray-100/50 transition-colors">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg overflow-hidden flex items-center justify-center">
+                      {qr.image_url ? (
+                        <img src={qr.image_url} alt="qr" className="w-8 h-8 object-cover" />
+                      ) : (
+                        <span className="text-xs">QR</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{qr.type}</p>
+                      <p className="text-xs text-gray-500">{new Date(qr.created_at || Date.now()).toLocaleString()}</p>
+                    </div>
+                  </div>
+                  {qr.image_url && (
+                    <button
+                      className="text-gray-400 hover:text-blue-500 transition-colors"
+                      onClick={() => {
+                        const link = document.createElement('a')
+                        link.href = qr.image_url as string
+                        link.download = 'qr-code.png'
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                      }}
+                    >
+                      <Download size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button className="w-full text-center py-2 text-xs text-blue-600 hover:text-blue-700 transition-colors">
+                View all history
+              </button>
+            </div>
+            </div>
+
+            {/* Quick Templates */}
+            <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
+              <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center">
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                Quick Templates
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    setSelectedType(QRType.URL)
+                    setQrData({ url: 'https://example.com' })
+                    setStyle((s) => ({ ...s, foregroundColor: '#0f172a', backgroundColor: '#ffffff' }))
+                  }}
+                  className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl hover:from-blue-100 hover:to-blue-200 transition-all duration-200 text-center group">
+                  <div className="text-2xl mb-2">🌐</div>
+                  <p className="text-xs font-medium text-gray-700">Website</p>
+                  <p className="text-xs text-gray-500">Quick URL</p>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setSelectedType(QRType.EMAIL)
+                    setQrData({ email: 'hello@example.com', subject: 'Hello', body: 'Hi there!' })
+                  }}
+                  className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-2xl hover:from-green-100 hover:to-green-200 transition-all duration-200 text-center group">
+                  <div className="text-2xl mb-2">📧</div>
+                  <p className="text-xs font-medium text-gray-700">Email</p>
+                  <p className="text-xs text-gray-500">Contact Me</p>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setSelectedType(QRType.WIFI)
+                    setQrData({ ssid: 'MyWiFi', password: 'password123', security: 'WPA', hidden: false })
+                  }}
+                  className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl hover:from-purple-100 hover:to-purple-200 transition-all duration-200 text-center group">
+                  <div className="text-2xl mb-2">📶</div>
+                  <p className="text-xs font-medium text-gray-700">WiFi</p>
+                  <p className="text-xs text-gray-500">Share Network</p>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setSelectedType(QRType.VCARD)
+                    setQrData({ name: 'John Doe', organization: 'Company', phone: '+1 234 567 8900', email: 'john@example.com', website: 'https://example.com' })
+                  }}
+                  className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl hover:from-orange-100 hover:to-orange-200 transition-all duration-200 text-center group">
+                  <div className="text-2xl mb-2">👤</div>
+                  <p className="text-xs font-medium text-gray-700">vCard</p>
+                  <p className="text-xs text-gray-500">Business Card</p>
+                </button>
+              </div>
+            </div>
+
+            {/* Batch Generator */}
+            <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
+              <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center">
+                <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                Batch Generator
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-2">Upload CSV File</label>
+                  <label className="block border-2 border-dashed border-gray-300 rounded-2xl p-4 text-center hover:border-blue-400 transition-colors cursor-pointer">
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        const text = await file.text()
+                        // Simple CSV parse: type,content
+                        const rows = text.split(/\r?\n/).filter(Boolean)
+                        let created = 0
+                        for (const row of rows) {
+                          const [type, content] = row.split(',')
+                          if (!type || !content) continue
+                          try {
+                            const dataUrl = await QRCode.toDataURL(content, {
+                              width: style.size,
+                              margin: style.margin,
+                              color: { dark: style.foregroundColor, light: style.backgroundColor },
+                              errorCorrectionLevel: style.errorCorrectionLevel
+                            })
+                            await dbOperations.createQRCode({
+                              type: type.trim(),
+                              content: content.trim(),
+                              data: {},
+                              style: style as unknown as Record<string, unknown>,
+                              image_url: dataUrl
+                            }, user?.id)
+                            created++
+                          } catch (err) {
+                            console.warn('Failed to create QR from CSV row:', row, err)
+                          }
+                        }
+                        alert(`Created ${created} QR codes from CSV`)
+                        fetchRecent()
+                      }}
+                    />
+                    <div className="text-2xl mb-2">📁</div>
+                    <p className="text-sm text-gray-600">Drop CSV file here</p>
+                    <p className="text-xs text-gray-500">or click to browse</p>
+                  </label>
+                </div>
+                
+                <button className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-medium py-3 px-4 rounded-2xl transition-all duration-200 text-sm">
+                  Generate Batch QRs
+                </button>
+              </div>
+            </div>
+
+            {/* Export Options */}
+            <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
+              <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center">
+                <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
+                Export Options
+              </h3>
+              <div className="space-y-3">
+                <button
+                  onClick={async () => {
+                    const content = formatQRContent()
+                    if (!content) return alert('Generate a QR first')
+                    // Lazy import jsPDF to avoid bundling cost
+                    const { jsPDF } = await import('jspdf')
+                    const doc = new jsPDF({ unit: 'px', format: [style.size + 64, style.size + 64] })
+                    const img = qrImageUrl
+                    if (!img) return alert('Generate a QR first')
+                    doc.addImage(img, 'PNG', 32, 32, style.size, style.size)
+                    doc.save('qr-code.pdf')
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 p-3 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-colors text-sm">
+                  <span>📄</span>
+                  <span>Export as PDF</span>
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    const content = formatQRContent()
+                    if (!content) return alert('Generate a QR first')
+                    const svgString = await QRCode.toString(content, {
+                      type: 'svg',
+                      width: style.size,
+                      margin: style.margin,
+                      color: { dark: style.foregroundColor, light: style.backgroundColor },
+                      errorCorrectionLevel: style.errorCorrectionLevel
+                    })
+                    const blob = new Blob([svgString], { type: 'image/svg+xml' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = 'qr-code.svg'
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    URL.revokeObjectURL(url)
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 p-3 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-colors text-sm">
+                  <span>🖼️</span>
+                  <span>Export as SVG</span>
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    if (!qrImageUrl) return alert('Generate a QR first')
+                    alert('Analytics export would include scan data from Supabase (stub).')
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 p-3 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-colors text-sm">
+                  <span>📊</span>
+                  <span>Export with Analytics</span>
+                </button>
+              </div>
+            </div>
+
+            {/* QR Analytics Preview */}
+            <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
+              <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center">
+                <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                QR Analytics
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Total Scans</span>
+                  <span className="text-lg font-bold text-blue-600">247</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">This Week</span>
+                  <span className="text-lg font-bold text-green-600">42</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Success Rate</span>
+                  <span className="text-lg font-bold text-purple-600">94%</span>
+                </div>
+                
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  <button className="text-xs text-blue-600 hover:text-blue-700 transition-colors">
+                    View detailed analytics →
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </motion.div>
       </div>

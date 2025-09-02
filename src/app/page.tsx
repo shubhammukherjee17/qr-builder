@@ -2,13 +2,23 @@
 
 import QRBuilder from '@/components/QRBuilder'
 import QRCube3D from '@/components/QRCube3D'
+import Floating3DElements from '@/components/Floating3DElements'
+import Auth from '@/components/Auth'
+import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { useSmoothScroll } from '@/hooks/useSmoothScroll'
-import { QrCode, ArrowDown, Sparkles, Zap } from 'lucide-react'
+import { QrCode, ArrowDown, Sparkles, Zap, LogOut, User } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase'
 
-export default function Home() {
+function MainApp() {
+  const { user, signOut, loading } = useAuth()
   // Enable smooth scrolling
   useSmoothScroll()
+
+  const handleSignOut = async () => {
+    await signOut()
+  }
 
   const scrollToBuilder = () => {
     const generatorSection = document.getElementById('generator')
@@ -18,6 +28,23 @@ export default function Home() {
         block: 'start' 
       })
     }
+  }
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show authentication screen if not authenticated and Supabase is configured
+  if (!user && supabase) {
+    return <Auth />
   }
 
 
@@ -50,14 +77,34 @@ export default function Home() {
               </span>
             </motion.div>
             
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={scrollToBuilder}
-              className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-            >
-              Create QR
-            </motion.button>
+            <div className="flex items-center space-x-4">
+              {user && supabase ? (
+                <>
+                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                    <User className="h-4 w-4" />
+                    <span>{user.email}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSignOut}
+                    className="text-gray-600 hover:text-red-600"
+                  >
+                    <LogOut className="h-4 w-4 mr-1" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={scrollToBuilder}
+                  className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  Create QR
+                </motion.button>
+              )}
+            </div>
           </div>
         </div>
       </motion.header>
@@ -113,7 +160,7 @@ export default function Home() {
             transition={{ duration: 1, delay: 0.6 }}
             className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto leading-relaxed"
           >
-            Generate unlimited QR codes instantly. No signups, no limits, no hassle.
+            Generate unlimited QR codes instantly. {user && supabase ? 'Welcome back! Your QR codes are saved to your account.' : 'No signups, no limits, no hassle.'}
           </motion.p>
           
           <motion.button
@@ -144,9 +191,12 @@ export default function Home() {
         whileInView={{ opacity: 1 }}
         transition={{ duration: 0.8 }}
         viewport={{ once: true }}
-        className="relative py-16 z-20 bg-white/70 backdrop-blur-sm"
+        className="relative py-16 z-20 bg-white/70 backdrop-blur-sm overflow-hidden"
       >
-        <div className="max-w-7xl mx-auto px-6">
+        {/* Floating 3D Elements */}
+        <Floating3DElements />
+        
+        <div className="relative max-w-7xl mx-auto px-6 z-10">
           <motion.div 
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -159,6 +209,11 @@ export default function Home() {
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Generate QR codes for URLs, text, WiFi, contacts and more
+              {user && supabase && (
+                <span className="block mt-2 text-blue-600 font-medium">
+                  ✨ Your QR codes are automatically saved to your account
+                </span>
+              )}
             </p>
           </motion.div>
           <QRBuilder />
@@ -188,5 +243,13 @@ export default function Home() {
       </motion.footer>
 
     </div>
+  )
+}
+
+export default function Home() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   )
 }

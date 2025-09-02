@@ -13,8 +13,15 @@ export interface QRCodeStyle {
   backgroundColor: string
   size: number
   margin: number
+  errorCorrectionLevel: 'L' | 'M' | 'Q' | 'H'
   logoUrl?: string
   logoSize?: number
+  cornerRadius?: number
+  dotStyle: 'square' | 'rounded' | 'dots'
+  cornerStyle: 'square' | 'rounded' | 'extra-rounded'
+  gradientType: 'none' | 'linear' | 'radial'
+  gradientColor?: string
+  pattern: 'default' | 'dots' | 'squares' | 'rounded'
 }
 
 export interface QRCodeData {
