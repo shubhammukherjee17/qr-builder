@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { QRType, QRCodeStyle } from '@/types'
+import { QRType, QRCodeStyle, MapProvider } from '@/types'
+import { MAP_PROVIDERS, formatMapsUrl, validateMapsInput, isMapLink, parseMapLink } from '@/lib/maps-utils'
 import { Download, Copy, RefreshCw, Check, ChevronDown } from 'lucide-react'
 import QRCode from 'qrcode'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -16,6 +17,7 @@ const QR_TYPES = [
   { value: QRType.SMS, label: 'SMS Message' },
   { value: QRType.WIFI, label: 'WiFi Network' },
   { value: QRType.VCARD, label: 'Contact Card' },
+  { value: QRType.MAPS, label: 'Location / Maps' },
 ]
 
 export default function QRBuilder() {
@@ -46,44 +48,54 @@ export default function QRBuilder() {
     setStyle(prev => ({ ...prev, [key]: value }))
   }
 
-  const formatQRContent = (): string => {
+  const formatQRContent = (dataOverride?: Record<string, string | boolean>): string => {
+    const data = dataOverride ?? qrData
     // Helper function to safely convert to string
     const toString = (value: string | boolean | undefined): string => {
       return typeof value === 'string' ? value : (value === true ? 'true' : (value === false ? 'false' : ''))
     }
 
+    const normalizeUrlContent = (value: string): string => {
+      if (!value.trim()) return ''
+      if (!isMapLink(value)) return value
+      const parsed = parseMapLink(value)
+      return parsed.valid ? formatMapsUrl({ locationMode: 'link', mapLink: value, mapProvider: MapProvider.GOOGLE }) : value
+    }
+
     switch (selectedType) {
       case QRType.TEXT:
-        return toString(qrData.text)
+        return toString(data.text)
       case QRType.URL:
-        return toString(qrData.url)
+        return normalizeUrlContent(toString(data.url))
       case QRType.EMAIL:
-        const emailParts = [`mailto:${toString(qrData.email)}`]
-        const subject = toString(qrData.subject)
-        const body = toString(qrData.body)
+        const emailParts = [`mailto:${toString(data.email)}`]
+        const subject = toString(data.subject)
+        const body = toString(data.body)
         if (subject) emailParts.push(`subject=${encodeURIComponent(subject)}`)
         if (body) emailParts.push(`body=${encodeURIComponent(body)}`)
         return emailParts.join(emailParts.length > 1 ? '?' : '') + (emailParts.length > 2 ? emailParts.slice(2).join('&') : '')
       case QRType.PHONE:
-        return `tel:${toString(qrData.phone)}`
+        return `tel:${toString(data.phone)}`
       case QRType.SMS:
-        const message = toString(qrData.message)
-        return `sms:${toString(qrData.phone)}${message ? `?body=${encodeURIComponent(message)}` : ''}`
+        const message = toString(data.message)
+        return `sms:${toString(data.phone)}${message ? `?body=${encodeURIComponent(message)}` : ''}`
       case QRType.WIFI:
-        return `WIFI:T:${toString(qrData.security) || 'WPA'};S:${toString(qrData.ssid)};P:${toString(qrData.password)};H:${qrData.hidden ? 'true' : 'false'};;`
+        return `WIFI:T:${toString(data.security) || 'WPA'};S:${toString(data.ssid)};P:${toString(data.password)};H:${data.hidden ? 'true' : 'false'};;`
       case QRType.VCARD:
         const vcard = [
           'BEGIN:VCARD',
           'VERSION:3.0',
-          `FN:${toString(qrData.name)}`,
-          qrData.organization ? `ORG:${toString(qrData.organization)}` : '',
-          qrData.phone ? `TEL:${toString(qrData.phone)}` : '',
-          qrData.email ? `EMAIL:${toString(qrData.email)}` : '',
-          qrData.website ? `URL:${toString(qrData.website)}` : '',
-          qrData.note ? `NOTE:${toString(qrData.note)}` : '',
+          `FN:${toString(data.name)}`,
+          data.organization ? `ORG:${toString(data.organization)}` : '',
+          data.phone ? `TEL:${toString(data.phone)}` : '',
+          data.email ? `EMAIL:${toString(data.email)}` : '',
+          data.website ? `URL:${toString(data.website)}` : '',
+          data.note ? `NOTE:${toString(data.note)}` : '',
           'END:VCARD'
         ].filter(Boolean).join('\n')
         return vcard
+      case QRType.MAPS:
+        return formatMapsUrl(data)
       default:
         return ''
     }
@@ -104,8 +116,18 @@ export default function QRBuilder() {
     fetchRecent()
   }, [user, fetchRecent])
 
-  const generateQR = async () => {
-    const content = formatQRContent()
+  const generateQR = async (dataOverride?: Record<string, string | boolean>) => {
+    const data = dataOverride ?? qrData
+
+    if (selectedType === QRType.MAPS) {
+      const validation = validateMapsInput(data)
+      if (!validation.valid) {
+        alert(validation.error || 'Please fill in the required location data')
+        return
+      }
+    }
+
+    const content = formatQRContent(data)
     if (!content.trim()) {
       alert('Please fill in the required data')
       return
@@ -113,7 +135,6 @@ export default function QRBuilder() {
 
     setIsGenerating(true)
     try {
-      // Generate QR code using qrcode library
       const canvas = canvasRef.current
       if (canvas) {
         await QRCode.toCanvas(canvas, content, {
@@ -126,28 +147,24 @@ export default function QRBuilder() {
           errorCorrectionLevel: style.errorCorrectionLevel
         })
         
-        // Convert canvas to data URL
         const dataUrl = canvas.toDataURL('image/png')
         setQrImageUrl(dataUrl)
 
-        // Persist to database (Supabase) if configured and user is authenticated
         if (supabase) {
           try {
             await dbOperations.createQRCode({
               type: selectedType,
               content,
-              data: qrData as Record<string, unknown>,
+              data: data as Record<string, unknown>,
               style: style as unknown as Record<string, unknown>,
               image_url: dataUrl,
-            }, user?.id) // Pass user ID if authenticated
-            // Refresh recent list
+            }, user?.id)
             fetchRecent()
           } catch (e) {
             console.warn('Failed to save QR to database:', e)
           }
         }
         
-        // Scroll to preview section after a short delay to allow the image to render
         setTimeout(() => {
           const previewSection = document.querySelector('[data-qr-preview]')
           if (previewSection) {
@@ -164,6 +181,31 @@ export default function QRBuilder() {
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  const handleMapLinkInput = async (url: string) => {
+    const trimmed = url.trim()
+    const newData: Record<string, string | boolean> = {
+      ...qrData,
+      locationMode: 'link',
+      mapLink: trimmed,
+      mapProvider: MapProvider.GEO, // Use universal geo: URI format
+    }
+
+    if (trimmed && isMapLink(trimmed)) {
+      const parsed = parseMapLink(trimmed)
+      if (parsed.valid) {
+        if (parsed.latitude) newData.latitude = parsed.latitude
+        if (parsed.longitude) newData.longitude = parsed.longitude
+        if (parsed.label) newData.label = parsed.label
+        if (parsed.address) newData.address = parsed.address
+        setQrData(newData)
+        await generateQR(newData)
+        return
+      }
+    }
+
+    setQrData(newData)
   }
 
   const downloadQR = () => {
@@ -428,6 +470,164 @@ export default function QRBuilder() {
           </div>
         )
 
+      case QRType.MAPS: {
+        const locationMode = String(qrData.locationMode || 'link')
+        const parsedLink = qrData.mapLink && isMapLink(String(qrData.mapLink))
+          ? parseMapLink(String(qrData.mapLink))
+          : null
+
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className={labelClassName}>Location Input</label>
+              <div className="relative">
+                <select
+                  className={`${inputClassName} appearance-none`}
+                  value={locationMode}
+                  onChange={(e) => handleDataChange('locationMode', e.target.value)}
+                >
+                  <option value="link">Paste Map Link</option>
+                  <option value="coordinates">Coordinates (Lat / Lng)</option>
+                  <option value="address">Address / Place Name</option>
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+              </div>
+            </div>
+
+            {locationMode === 'link' ? (
+              <>
+                <div>
+                  <label className={labelClassName}>Google Maps Link</label>
+                  <input
+                    type="url"
+                    className={inputClassName}
+                    placeholder="Paste a Google Maps share link..."
+                    value={String(qrData.mapLink || '')}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      handleDataChange('mapLink', value)
+                      if (value.trim() && isMapLink(value.trim())) {
+                        void handleMapLinkInput(value)
+                      }
+                    }}
+                    onPaste={(e) => {
+                      const text = e.clipboardData.getData('text')
+                      if (text.trim() && isMapLink(text.trim())) {
+                        e.preventDefault()
+                        void handleMapLinkInput(text)
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Paste any Google Maps link — QR generates instantly. Opens in ANY maps app on your device!
+                  </p>
+                </div>
+
+                {parsedLink?.valid && (parsedLink.latitude || parsedLink.address || parsedLink.useOriginalUrl) && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-2xl text-sm text-green-800">
+                    {parsedLink.latitude && parsedLink.longitude ? (
+                      <p>
+                        <span className="font-medium">Detected:</span>{' '}
+                        {parsedLink.label ? `${parsedLink.label} — ` : ''}
+                        {parsedLink.latitude}, {parsedLink.longitude}
+                      </p>
+                    ) : parsedLink.address ? (
+                      <p><span className="font-medium">Detected:</span> {parsedLink.address}</p>
+                    ) : (
+                      <p><span className="font-medium">Link ready</span> — Opens in your device&apos;s maps app</p>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className={labelClassName}>Map Provider</label>
+                  <div className="relative">
+                    <select
+                      className={`${inputClassName} appearance-none`}
+                      value={String(qrData.mapProvider || MapProvider.GEO)}
+                      onChange={(e) => handleDataChange('mapProvider', e.target.value)}
+                    >
+                      {MAP_PROVIDERS.map((provider) => (
+                        <option key={provider.value} value={provider.value}>
+                          {provider.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                {locationMode === 'coordinates' ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className={labelClassName}>Latitude</label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          className={inputClassName}
+                          placeholder="28.6139"
+                          value={String(qrData.latitude || '')}
+                          onChange={(e) => handleDataChange('latitude', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClassName}>Longitude</label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          className={inputClassName}
+                          placeholder="77.2090"
+                          value={String(qrData.longitude || '')}
+                          onChange={(e) => handleDataChange('longitude', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelClassName}>Place Label (Optional)</label>
+                      <input
+                        type="text"
+                        className={inputClassName}
+                        placeholder="India Gate, New Delhi"
+                        value={String(qrData.label || '')}
+                        onChange={(e) => handleDataChange('label', e.target.value)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <label className={labelClassName}>Address or Place Name</label>
+                    <input
+                      type="text"
+                      className={inputClassName}
+                      placeholder="1600 Amphitheatre Parkway, Mountain View, CA"
+                      value={String(qrData.address || '')}
+                      onChange={(e) => handleDataChange('address', e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className={labelClassName}>Zoom Level (Optional)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    className={inputClassName}
+                    placeholder="16"
+                    value={String(qrData.zoom || '16')}
+                    onChange={(e) => handleDataChange('zoom', e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Used by OpenStreetMap and Bing Maps</p>
+                </div>
+              </>
+            )}
+          </div>
+        )
+      }
+
       default:
         return null
     }
@@ -457,7 +657,13 @@ export default function QRBuilder() {
                 <select
                   className="w-full p-4 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                   value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value as QRType)}
+                  onChange={(e) => {
+                    const newType = e.target.value as QRType
+                    setSelectedType(newType)
+                    if (newType === QRType.MAPS) {
+                      setQrData(prev => ({ ...prev, locationMode: prev.locationMode || 'link' }))
+                    }
+                  }}
                 >
                   {QR_TYPES.map((type) => (
                     <option key={type.value} value={type.value}>
@@ -697,7 +903,7 @@ export default function QRBuilder() {
           <motion.button
             whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
-            onClick={generateQR}
+            onClick={() => void generateQR()}
             disabled={isGenerating}
             className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-4 px-6 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all duration-200"
           >
@@ -867,6 +1073,21 @@ export default function QRBuilder() {
                 Quick Templates
               </h3>
               <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    setSelectedType(QRType.MAPS)
+                    setQrData({
+                      locationMode: 'link',
+                      mapLink: 'https://www.google.com/maps/place/India+Gate/@28.612912,77.2295107,17z',
+                      mapProvider: MapProvider.GEO,
+                    })
+                  }}
+                  className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-2xl hover:from-red-100 hover:to-red-200 transition-all duration-200 text-center group">
+                  <div className="text-2xl mb-2">📍</div>
+                  <p className="text-xs font-medium text-gray-700">Maps</p>
+                  <p className="text-xs text-gray-500">Share Location</p>
+                </button>
+
                 <button
                   onClick={() => {
                     setSelectedType(QRType.URL)

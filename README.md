@@ -1,4 +1,4 @@
-# QR Builder with 3D Effects & Supabase Backend
+# QR Builder
 
 A modern, feature-rich QR code generator with stunning 3D animations, extensive customization options, and powerful database integration using Supabase.
 
@@ -11,7 +11,15 @@ A modern, feature-rich QR code generator with stunning 3D animations, extensive 
 - Smooth animations using Framer Motion
 
 ### 🛠️ **QR Code Generation**
-- **7 QR Types**: Text, URL, Email, Phone, SMS, WiFi, vCard
+- **8 QR Types**: Text, URL, Email, Phone, SMS, WiFi, vCard, **Location/Maps**
+- **Universal Location QR Codes**:
+  - Paste any Google Maps link - QR generates instantly
+  - Uses **geo: URI standard** - works with **ANY maps app**
+  - **iOS**: Opens in Apple Maps, Google Maps, Waze, or user's choice
+  - **Android**: Opens in Google Maps, Waze, or user's choice
+  - **Desktop**: Opens in default maps app or browser
+  - Works offline with downloaded maps
+  - Better privacy (no tracking redirects)
 - **Advanced Customization**:
   - Colors & gradients (linear, radial)
   - Dot styles (square, rounded, dots)
@@ -101,6 +109,28 @@ Visit `http://localhost:3000` to see your QR Builder in action! 🎉
 3. Customize colors, size, and style
 4. Click **Generate QR Code**
 5. Download or copy your QR code
+
+### Google Maps QR Codes (Cross-Platform)
+1. Select **Location / Maps** type
+2. **Simply paste** any Google Maps link (long or short)
+3. QR code generates **automatically** - no button needed!
+4. **Opens in user's preferred maps app**:
+   - ✅ iOS: Apple Maps, Google Maps, Waze, or default
+   - ✅ Android: Google Maps, Waze, or default
+   - ✅ Desktop: Maps app or browser
+   - ✅ Works offline with downloaded maps
+   - ✅ Better privacy (uses universal geo: URI standard)
+
+**Supported formats:**
+- Full URLs: `https://www.google.com/maps/place/...`
+- Short links: `https://goo.gl/maps/abc123`
+- App links: `https://maps.app.goo.gl/xyz789`
+- Or manually enter coordinates/addresses
+
+**What gets generated:**
+- Universal `geo:` URI format (RFC 5870)
+- Example: `geo:28.6139,77.2090?q=India Gate`
+- Works with **any** maps application!
 
 ### Quick Templates
 - Click any template button in the right sidebar

@@ -1,5 +1,6 @@
 import QRCode from 'qrcode'
 import { QRType, QRCodeStyle, QRCodeData } from '@/types'
+import { formatMapsUrl, isMapLink } from '@/lib/maps-utils'
 
 
 const defaultStyle: QRCodeStyle = {
@@ -40,12 +41,18 @@ export function formatContent(type: QRType, data: Record<string, string | boolea
     return typeof value === 'string' ? value : (value === true ? 'true' : (value === false ? 'false' : ''))
   }
 
+  const normalizeUrlContent = (value: string): string => {
+    if (!value.trim()) return ''
+    if (!isMapLink(value)) return value
+    return formatMapsUrl({ locationMode: 'link', mapLink: value, mapProvider: 'google' })
+  }
+
   switch (type) {
     case QRType.TEXT:
       return toString(data.text)
     
     case QRType.URL:
-      return toString(data.url)
+      return normalizeUrlContent(toString(data.url))
     
     case QRType.EMAIL:
       return `mailto:${toString(data.email)}?subject=${encodeURIComponent(toString(data.subject))}&body=${encodeURIComponent(toString(data.body))}`
@@ -69,6 +76,9 @@ EMAIL:${toString(data.email)}
 URL:${toString(data.website)}
 NOTE:${toString(data.note)}
 END:VCARD`
+
+    case QRType.MAPS:
+      return formatMapsUrl(data)
     
     default:
       return toString(data.content)

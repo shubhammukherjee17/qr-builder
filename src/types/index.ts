@@ -5,8 +5,21 @@ export enum QRType {
   PHONE = 'PHONE',
   SMS = 'SMS',
   WIFI = 'WIFI',
-  VCARD = 'VCARD'
+  VCARD = 'VCARD',
+  MAPS = 'MAPS',
 }
+
+export enum MapProvider {
+  GEO = 'geo',
+  GOOGLE = 'google',
+  APPLE = 'apple',
+  MAPPLS = 'mappls',
+  OPENSTREETMAP = 'osm',
+  BING = 'bing',
+  WAZE = 'waze',
+}
+
+export type LocationInputMode = 'link' | 'coordinates' | 'address'
 
 export interface QRCodeStyle {
   foregroundColor: string
