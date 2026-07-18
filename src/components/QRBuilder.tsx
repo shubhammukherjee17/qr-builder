@@ -62,6 +62,7 @@ export default function QRBuilder() {
       return parsed.valid ? formatMapsUrl({ locationMode: 'link', mapLink: value, mapProvider: MapProvider.GOOGLE }) : value
     }
 
+    
     switch (selectedType) {
       case QRType.TEXT:
         return toString(data.text)
