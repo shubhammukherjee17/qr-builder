@@ -3,43 +3,110 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { QRType, QRCodeStyle, MapProvider } from '@/types'
 import { MAP_PROVIDERS, formatMapsUrl, validateMapsInput, isMapLink, parseMapLink } from '@/lib/maps-utils'
-import { Download, Copy, RefreshCw, Check, ChevronDown } from 'lucide-react'
-import QRCode from 'qrcode'
-import { motion, AnimatePresence } from 'framer-motion'
-import { dbOperations, type QRCodeRecord, supabase } from '@/lib/supabase'
+import { renderQRCodeToCanvas } from '@/lib/qr-renderer'
+import { STYLE_PRESETS } from '@/lib/qr-presets'
+import { dbOperations, type QRCodeRecord } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import QRCode from 'qrcode'
+import {
+  Globe, Type, Mail, Phone, MessageSquare, Wifi, Contact, MapPin,
+  Download, Copy, Check, ChevronDown, Upload, FileText, Image as ImageIcon,
+  Sparkles, History as HistoryIcon, X, Trash2, Eye, EyeOff,
+  Palette, Sliders, ShieldCheck, FileSpreadsheet, ArrowRight, RefreshCw,
+  Share2, Utensils, Smartphone, MoreHorizontal, Undo2, Redo2
+} from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
-const QR_TYPES = [
-  { value: QRType.TEXT, label: 'Text' },
-  { value: QRType.URL, label: 'Website URL' },
-  { value: QRType.EMAIL, label: 'Email' },
-  { value: QRType.PHONE, label: 'Phone Number' },
-  { value: QRType.SMS, label: 'SMS Message' },
-  { value: QRType.WIFI, label: 'WiFi Network' },
-  { value: QRType.VCARD, label: 'Contact Card' },
-  { value: QRType.MAPS, label: 'Location / Maps' },
+export interface ExtendedQRTypeItem {
+  id: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  qrType: QRType
+  placeholder: string
+  description?: string
+}
+
+const EXTENDED_TYPES: ExtendedQRTypeItem[] = [
+  { id: 'website', label: 'Website', icon: Globe, qrType: QRType.URL, placeholder: 'https://example.com' },
+  { id: 'text', label: 'Text', icon: Type, qrType: QRType.TEXT, placeholder: 'Share a message, notes or quote...' },
+  { id: 'email', label: 'Email', icon: Mail, qrType: QRType.EMAIL, placeholder: 'contact@brand.com' },
+  { id: 'phone', label: 'Phone', icon: Phone, qrType: QRType.PHONE, placeholder: '+1 (555) 000-0000' },
+  { id: 'wifi', label: 'Wi-Fi', icon: Wifi, qrType: QRType.WIFI, placeholder: 'Network name (SSID)' },
+  { id: 'location', label: 'Location', icon: MapPin, qrType: QRType.MAPS, placeholder: 'Google Maps link or address' },
+  { id: 'vcard', label: 'vCard', icon: Contact, qrType: QRType.VCARD, placeholder: 'Full Name' },
+  { id: 'social', label: 'Social Media', icon: Share2, qrType: QRType.URL, placeholder: 'https://instagram.com/yourhandle' },
+  { id: 'pdf', label: 'PDF', icon: FileText, qrType: QRType.URL, placeholder: 'https://example.com/document.pdf' },
+  { id: 'app', label: 'App Download', icon: Smartphone, qrType: QRType.URL, placeholder: 'https://apps.apple.com/app/id12345' },
+  { id: 'menu', label: 'Menu', icon: Utensils, qrType: QRType.URL, placeholder: 'https://restaurant.com/menu' },
+  { id: 'more', label: 'More', icon: MoreHorizontal, qrType: QRType.TEXT, placeholder: 'Custom payload...' },
 ]
+
+const COLOR_SWATCHES = [
+  '#7c3aed', // Purple
+  '#ec4899', // Pink
+  '#f43f5e', // Rose
+  '#f97316', // Orange
+  '#eab308', // Amber
+  '#10b981', // Emerald
+  '#06b6d4', // Cyan
+  '#2563eb', // Blue
+  '#0f172a', // Navy / Dark
+]
+
+const DEFAULT_STYLE: QRCodeStyle = {
+  foregroundColor: '#7c3aed',
+  backgroundColor: '#ffffff',
+  size: 512,
+  margin: 2,
+  errorCorrectionLevel: 'M',
+  dotStyle: 'rounded',
+  cornerStyle: 'rounded',
+  gradientType: 'none',
+  pattern: 'default',
+}
 
 export default function QRBuilder() {
   const { user } = useAuth()
-  const [selectedType, setSelectedType] = useState<QRType>(QRType.TEXT)
-  const [qrData, setQrData] = useState<Record<string, string | boolean>>({})
-  const [style, setStyle] = useState<QRCodeStyle>({
-    foregroundColor: '#000000',
-    backgroundColor: '#ffffff',
-    size: 256,
-    margin: 4,
-    errorCorrectionLevel: 'M',
-    dotStyle: 'square',
-    cornerStyle: 'square',
-    gradientType: 'none',
-    pattern: 'default',
-  })
-  const [qrImageUrl, setQrImageUrl] = useState<string>('')
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [recentQRCodes, setRecentQRCodes] = useState<QRCodeRecord[]>([])
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
 
+  // Navigation & Subtabs
+  const [activeTab, setActiveTab] = useState<'studio' | 'batch'>('studio')
+  const [activeTypeId, setActiveTypeId] = useState<string>('website')
+  const [styleTab, setStyleTab] = useState<'style' | 'frame' | 'logo' | 'colors'>('style')
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [isDynamic, setIsDynamic] = useState(false)
+
+  // QR Content State
+  const [qrData, setQrData] = useState<Record<string, string | boolean>>({
+    url: 'https://qraft.io',
+    name: 'My Website',
+    frameText: 'Scan to visit My Website',
+  })
+
+  // Style State
+  const [style, setStyle] = useState<QRCodeStyle>(DEFAULT_STYLE)
+  const [logoImage, setLogoImage] = useState<HTMLImageElement | null>(null)
+  const [frameEnabled, setFrameEnabled] = useState(true)
+
+  // Export & UI State
+  const [qrImageUrl, setQrImageUrl] = useState<string>('')
+  const [downloadFormat, setDownloadFormat] = useState<'png' | 'svg' | 'pdf'>('png')
+  const [copied, setCopied] = useState(false)
+  const [savedSuccess, setSavedSuccess] = useState(false)
+  const [showWifiPassword, setShowWifiPassword] = useState(false)
+  const [recentQRCodes, setRecentQRCodes] = useState<QRCodeRecord[]>([])
+  
+  // Batch State
+  const [batchRows, setBatchRows] = useState<Array<{ type: string; content: string; status?: string }>>([])
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false)
+
+  const activeTypeItem = EXTENDED_TYPES.find(t => t.id === activeTypeId) || EXTENDED_TYPES[0]
+  const selectedType = activeTypeItem.qrType
+
+  // Data change
   const handleDataChange = (key: string, value: string | boolean) => {
     setQrData(prev => ({ ...prev, [key]: value }))
   }
@@ -48,1250 +115,698 @@ export default function QRBuilder() {
     setStyle(prev => ({ ...prev, [key]: value }))
   }
 
-  const formatQRContent = (dataOverride?: Record<string, string | boolean>): string => {
-    const data = dataOverride ?? qrData
-    // Helper function to safely convert to string
-    const toString = (value: string | boolean | undefined): string => {
-      return typeof value === 'string' ? value : (value === true ? 'true' : (value === false ? 'false' : ''))
-    }
+  // Format QR content for encoding
+  const formatQRContent = useCallback((): string => {
+    const toString = (val: unknown): string => (typeof val === 'string' ? val : val ? 'true' : '')
 
-    const normalizeUrlContent = (value: string): string => {
-      if (!value.trim()) return ''
-      if (!isMapLink(value)) return value
-      const parsed = parseMapLink(value)
-      return parsed.valid ? formatMapsUrl({ locationMode: 'link', mapLink: value, mapProvider: MapProvider.GOOGLE }) : value
-    }
-
-    
-    switch (selectedType) {
-      case QRType.TEXT:
-        return toString(data.text)
-      case QRType.URL:
-        return normalizeUrlContent(toString(data.url))
-      case QRType.EMAIL:
-        const emailParts = [`mailto:${toString(data.email)}`]
-        const subject = toString(data.subject)
-        const body = toString(data.body)
-        if (subject) emailParts.push(`subject=${encodeURIComponent(subject)}`)
-        if (body) emailParts.push(`body=${encodeURIComponent(body)}`)
-        return emailParts.join(emailParts.length > 1 ? '?' : '') + (emailParts.length > 2 ? emailParts.slice(2).join('&') : '')
-      case QRType.PHONE:
-        return `tel:${toString(data.phone)}`
-      case QRType.SMS:
-        const message = toString(data.message)
-        return `sms:${toString(data.phone)}${message ? `?body=${encodeURIComponent(message)}` : ''}`
-      case QRType.WIFI:
-        return `WIFI:T:${toString(data.security) || 'WPA'};S:${toString(data.ssid)};P:${toString(data.password)};H:${data.hidden ? 'true' : 'false'};;`
-      case QRType.VCARD:
-        const vcard = [
+    switch (activeTypeId) {
+      case 'website':
+      case 'social':
+      case 'pdf':
+      case 'app':
+      case 'menu': {
+        const url = toString(qrData.url).trim()
+        if (!url) return 'https://qraft.io'
+        if (isMapLink(url)) {
+          const parsed = parseMapLink(url)
+          return parsed.valid ? formatMapsUrl({ locationMode: 'link', mapLink: url, mapProvider: MapProvider.GOOGLE }) : url
+        }
+        return url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`
+      }
+      case 'text':
+      case 'more': {
+        const text = toString(qrData.text).trim()
+        return text || 'Welcome to Qraft Studio'
+      }
+      case 'email': {
+        const email = toString(qrData.email).trim() || 'hello@example.com'
+        const parts = [`mailto:${email}`]
+        const subject = toString(qrData.subject)
+        const body = toString(qrData.body)
+        if (subject) parts.push(`subject=${encodeURIComponent(subject)}`)
+        if (body) parts.push(`body=${encodeURIComponent(body)}`)
+        return parts.join(parts.length > 1 ? '?' : '') + (parts.length > 2 ? parts.slice(2).join('&') : '')
+      }
+      case 'phone':
+        return `tel:${toString(qrData.phone).trim() || '+1234567890'}`
+      case 'wifi': {
+        const ssid = toString(qrData.ssid) || 'OfficeWiFi'
+        const pass = toString(qrData.password)
+        const sec = toString(qrData.security) || 'WPA'
+        const hidden = Boolean(qrData.hidden)
+        return `WIFI:T:${sec};S:${ssid};P:${pass};H:${hidden ? 'true' : 'false'};;`
+      }
+      case 'vcard': {
+        const name = toString(qrData.name) || 'Alex Morgan'
+        const org = toString(qrData.organization)
+        const phone = toString(qrData.phone)
+        const email = toString(qrData.email)
+        const website = toString(qrData.website)
+        const note = toString(qrData.note)
+        return [
           'BEGIN:VCARD',
           'VERSION:3.0',
-          `FN:${toString(data.name)}`,
-          data.organization ? `ORG:${toString(data.organization)}` : '',
-          data.phone ? `TEL:${toString(data.phone)}` : '',
-          data.email ? `EMAIL:${toString(data.email)}` : '',
-          data.website ? `URL:${toString(data.website)}` : '',
-          data.note ? `NOTE:${toString(data.note)}` : '',
-          'END:VCARD'
+          `FN:${name}`,
+          org ? `ORG:${org}` : '',
+          phone ? `TEL:${phone}` : '',
+          email ? `EMAIL:${email}` : '',
+          website ? `URL:${website}` : '',
+          note ? `NOTE:${note}` : '',
+          'END:VCARD',
         ].filter(Boolean).join('\n')
-        return vcard
-      case QRType.MAPS:
-        return formatMapsUrl(data)
+      }
+      case 'location': {
+        const link = toString(qrData.mapLink) || 'https://maps.google.com'
+        return link
+      }
       default:
-        return ''
+        return toString(qrData.url) || 'https://qraft.io'
     }
-  }
+  }, [qrData, activeTypeId])
 
-  const fetchRecent = useCallback(async () => {
+  // Canvas rendering
+  const renderCode = useCallback(async () => {
+    if (!canvasRef.current) return
+    const content = formatQRContent()
     try {
-      // Only fetch user-specific QR codes if authenticated, otherwise get public ones
-      const userId = user?.id
-      const list = await dbOperations.getQRCodes(6, 0, userId)
-      setRecentQRCodes(list || [])
-    } catch (e) {
-      console.warn('Failed to fetch recent QRs:', e)
+      await renderQRCodeToCanvas({
+        content,
+        style,
+        canvas: canvasRef.current,
+        logoImage,
+      })
+      const dataUrl = canvasRef.current.toDataURL('image/png')
+      setQrImageUrl(dataUrl)
+    } catch (err) {
+      console.error('Render error:', err)
     }
-  }, [user?.id])
+  }, [formatQRContent, style, logoImage])
 
   useEffect(() => {
-    fetchRecent()
-  }, [user, fetchRecent])
+    const timer = setTimeout(() => {
+      void renderCode()
+    }, 40)
+    return () => clearTimeout(timer)
+  }, [renderCode])
 
-  const generateQR = async (dataOverride?: Record<string, string | boolean>) => {
-    const data = dataOverride ?? qrData
-
-    if (selectedType === QRType.MAPS) {
-      const validation = validateMapsInput(data)
-      if (!validation.valid) {
-        alert(validation.error || 'Please fill in the required location data')
-        return
+  // Logo upload
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const img = new Image()
+      img.onload = () => {
+        setLogoImage(img)
       }
+      img.src = event.target?.result as string
     }
+    reader.readAsDataURL(file)
+  }
 
-    const content = formatQRContent(data)
-    if (!content.trim()) {
-      alert('Please fill in the required data')
-      return
-    }
+  // Download export
+  const handleDownload = async () => {
+    const content = formatQRContent()
+    const filename = `qraft_${activeTypeId}_${Date.now()}`
 
-    setIsGenerating(true)
-    try {
-      const canvas = canvasRef.current
-      if (canvas) {
-        await QRCode.toCanvas(canvas, content, {
-          width: style.size,
+    if (downloadFormat === 'png') {
+      if (!canvasRef.current) return
+      const link = document.createElement('a')
+      link.download = `${filename}.png`
+      link.href = canvasRef.current.toDataURL('image/png')
+      link.click()
+    } else if (downloadFormat === 'svg') {
+      try {
+        const svgString = await QRCode.toString(content, {
+          type: 'svg',
+          errorCorrectionLevel: style.errorCorrectionLevel || 'M',
           margin: style.margin,
           color: {
             dark: style.foregroundColor,
-            light: style.backgroundColor
+            light: style.backgroundColor,
           },
-          errorCorrectionLevel: style.errorCorrectionLevel
         })
-        
-        const dataUrl = canvas.toDataURL('image/png')
-        setQrImageUrl(dataUrl)
-
-        if (supabase) {
-          try {
-            await dbOperations.createQRCode({
-              type: selectedType,
-              content,
-              data: data as Record<string, unknown>,
-              style: style as unknown as Record<string, unknown>,
-              image_url: dataUrl,
-            }, user?.id)
-            fetchRecent()
-          } catch (e) {
-            console.warn('Failed to save QR to database:', e)
-          }
-        }
-        
-        setTimeout(() => {
-          const previewSection = document.querySelector('[data-qr-preview]')
-          if (previewSection) {
-            previewSection.scrollIntoView({ 
-              behavior: 'smooth', 
-              block: 'center' 
-            })
-          }
-        }, 200)
+        const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.download = `${filename}.svg`
+        link.href = url
+        link.click()
+        URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error('SVG Export error:', err)
       }
-    } catch (error) {
-      console.error('Error generating QR code:', error)
-      alert('Failed to generate QR code')
-    } finally {
-      setIsGenerating(false)
+    } else if (downloadFormat === 'pdf') {
+      if (!canvasRef.current) return
+      const { jsPDF } = await import('jspdf')
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const imgData = canvasRef.current.toDataURL('image/png')
+      pdf.setFontSize(16)
+      pdf.text(String(qrData.name || 'Qraft QR Code'), 105, 35, { align: 'center' })
+      pdf.addImage(imgData, 'PNG', 55, 45, 100, 100)
+      pdf.setFontSize(10)
+      pdf.setTextColor(100)
+      pdf.text(String(qrData.frameText || 'Scan to view'), 105, 155, { align: 'center' })
+      pdf.save(`${filename}.pdf`)
     }
   }
 
-  const handleMapLinkInput = async (url: string) => {
-    const trimmed = url.trim()
-    const newData: Record<string, string | boolean> = {
-      ...qrData,
-      locationMode: 'link',
-      mapLink: trimmed,
-      mapProvider: MapProvider.GEO, // Use universal geo: URI format
-    }
-
-    if (trimmed && isMapLink(trimmed)) {
-      const parsed = parseMapLink(trimmed)
-      if (parsed.valid) {
-        if (parsed.latitude) newData.latitude = parsed.latitude
-        if (parsed.longitude) newData.longitude = parsed.longitude
-        if (parsed.label) newData.label = parsed.label
-        if (parsed.address) newData.address = parsed.address
-        setQrData(newData)
-        await generateQR(newData)
-        return
-      }
-    }
-
-    setQrData(newData)
-  }
-
-  const downloadQR = () => {
-    if (qrImageUrl) {
-      const link = document.createElement('a')
-      link.href = qrImageUrl
-      link.download = 'qr-code.png'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    }
-  }
-
-  const copyQRData = async () => {
-    if (qrImageUrl) {
-      try {
-        // Convert data URL to blob
-        const response = await fetch(qrImageUrl)
-        const blob = await response.blob()
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob })
-        ])
-        alert('QR code copied to clipboard!')
-      } catch (error) {
-        // Fallback to copying the data URL as text
-        try {
-          await navigator.clipboard.writeText(qrImageUrl)
-          alert('QR code data URL copied to clipboard!')
-        } catch (fallbackError) {
-          console.error('Failed to copy to clipboard:', error, fallbackError)
-          alert('Failed to copy QR code')
-        }
-      }
-    }
-  }
-
-  const renderDataForm = () => {
-    const inputClassName = "w-full p-4 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 placeholder-gray-400"
-    const labelClassName = "block text-sm font-medium text-gray-700 mb-2"
-
-    switch (selectedType) {
-      case QRType.TEXT:
-        return (
-          <div>
-            <label className={labelClassName}>Text Content</label>
-            <textarea
-              className={`${inputClassName} resize-none`}
-              rows={4}
-              placeholder="Enter your text here..."
-              value={String(qrData.text || '')}
-              onChange={(e) => handleDataChange('text', e.target.value)}
-            />
-          </div>
-        )
-
-      case QRType.URL:
-        return (
-          <div>
-            <label className={labelClassName}>Website URL</label>
-            <input
-              type="url"
-              className={inputClassName}
-              placeholder="https://example.com"
-              value={String(qrData.url || '')}
-              onChange={(e) => handleDataChange('url', e.target.value)}
-            />
-          </div>
-        )
-
-      case QRType.EMAIL:
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className={labelClassName}>Email Address</label>
-              <input
-                type="email"
-                className={inputClassName}
-                placeholder="example@email.com"
-                value={String(qrData.email || '')}
-                onChange={(e) => handleDataChange('email', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelClassName}>Subject (Optional)</label>
-              <input
-                type="text"
-                className={inputClassName}
-                placeholder="Email subject"
-                value={String(qrData.subject || '')}
-                onChange={(e) => handleDataChange('subject', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelClassName}>Message (Optional)</label>
-              <textarea
-                className={`${inputClassName} resize-none`}
-                rows={3}
-                placeholder="Email message"
-                value={String(qrData.body || '')}
-                onChange={(e) => handleDataChange('body', e.target.value)}
-              />
-            </div>
-          </div>
-        )
-
-      case QRType.PHONE:
-        return (
-          <div>
-            <label className={labelClassName}>Phone Number</label>
-            <input
-              type="tel"
-              className={inputClassName}
-              placeholder="+1 234 567 8900"
-              value={String(qrData.phone || '')}
-              onChange={(e) => handleDataChange('phone', e.target.value)}
-            />
-          </div>
-        )
-
-      case QRType.SMS:
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className={labelClassName}>Phone Number</label>
-              <input
-                type="tel"
-                className={inputClassName}
-                placeholder="+1 234 567 8900"
-                value={String(qrData.phone || '')}
-                onChange={(e) => handleDataChange('phone', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelClassName}>Message</label>
-              <textarea
-                className={`${inputClassName} resize-none`}
-                rows={3}
-                placeholder="SMS message"
-                value={String(qrData.message || '')}
-                onChange={(e) => handleDataChange('message', e.target.value)}
-              />
-            </div>
-          </div>
-        )
-
-      case QRType.WIFI:
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className={labelClassName}>Network Name (SSID)</label>
-              <input
-                type="text"
-                className={inputClassName}
-                placeholder="My WiFi Network"
-                value={String(qrData.ssid || '')}
-                onChange={(e) => handleDataChange('ssid', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelClassName}>Password</label>
-              <input
-                type="password"
-                className={inputClassName}
-                placeholder="WiFi Password"
-                value={String(qrData.password || '')}
-                onChange={(e) => handleDataChange('password', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelClassName}>Security Type</label>
-              <div className="relative">
-                <select
-                  className={`${inputClassName} appearance-none`}
-                  value={String(qrData.security || 'WPA')}
-                  onChange={(e) => handleDataChange('security', e.target.value)}
-                >
-                  <option value="WPA">WPA/WPA2</option>
-                  <option value="WEP">WEP</option>
-                  <option value="nopass">Open Network</option>
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-            <div className="flex items-center mt-4">
-              <input
-                type="checkbox"
-                id="hidden"
-                className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                checked={Boolean(qrData.hidden)}
-                onChange={(e) => handleDataChange('hidden', e.target.checked)}
-              />
-              <label htmlFor="hidden" className="text-sm text-gray-700">Hidden Network</label>
-            </div>
-          </div>
-        )
-
-      case QRType.VCARD:
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className={labelClassName}>Full Name</label>
-              <input
-                type="text"
-                className={inputClassName}
-                placeholder="John Doe"
-                value={String(qrData.name || '')}
-                onChange={(e) => handleDataChange('name', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelClassName}>Organization</label>
-              <input
-                type="text"
-                className={inputClassName}
-                placeholder="Company Name"
-                value={String(qrData.organization || '')}
-                onChange={(e) => handleDataChange('organization', e.target.value)}
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className={labelClassName}>Phone</label>
-                <input
-                  type="tel"
-                  className={inputClassName}
-                  placeholder="+1 234 567 8900"
-                  value={String(qrData.phone || '')}
-                  onChange={(e) => handleDataChange('phone', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className={labelClassName}>Email</label>
-                <input
-                  type="email"
-                  className={inputClassName}
-                  placeholder="john@example.com"
-                  value={String(qrData.email || '')}
-                  onChange={(e) => handleDataChange('email', e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <label className={labelClassName}>Website</label>
-              <input
-                type="url"
-                className={inputClassName}
-                placeholder="https://example.com"
-                value={String(qrData.website || '')}
-                onChange={(e) => handleDataChange('website', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className={labelClassName}>Notes</label>
-              <textarea
-                className={`${inputClassName} resize-none`}
-                rows={2}
-                placeholder="Additional notes"
-                value={String(qrData.note || '')}
-                onChange={(e) => handleDataChange('note', e.target.value)}
-              />
-            </div>
-          </div>
-        )
-
-      case QRType.MAPS: {
-        const locationMode = String(qrData.locationMode || 'link')
-        const parsedLink = qrData.mapLink && isMapLink(String(qrData.mapLink))
-          ? parseMapLink(String(qrData.mapLink))
-          : null
-
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className={labelClassName}>Location Input</label>
-              <div className="relative">
-                <select
-                  className={`${inputClassName} appearance-none`}
-                  value={locationMode}
-                  onChange={(e) => handleDataChange('locationMode', e.target.value)}
-                >
-                  <option value="link">Paste Map Link</option>
-                  <option value="coordinates">Coordinates (Lat / Lng)</option>
-                  <option value="address">Address / Place Name</option>
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-
-            {locationMode === 'link' ? (
-              <>
-                <div>
-                  <label className={labelClassName}>Google Maps Link</label>
-                  <input
-                    type="url"
-                    className={inputClassName}
-                    placeholder="Paste a Google Maps share link..."
-                    value={String(qrData.mapLink || '')}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      handleDataChange('mapLink', value)
-                      if (value.trim() && isMapLink(value.trim())) {
-                        void handleMapLinkInput(value)
-                      }
-                    }}
-                    onPaste={(e) => {
-                      const text = e.clipboardData.getData('text')
-                      if (text.trim() && isMapLink(text.trim())) {
-                        e.preventDefault()
-                        void handleMapLinkInput(text)
-                      }
-                    }}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Paste any Google Maps link — QR generates instantly. Opens in ANY maps app on your device!
-                  </p>
-                </div>
-
-                {parsedLink?.valid && (parsedLink.latitude || parsedLink.address || parsedLink.useOriginalUrl) && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-2xl text-sm text-green-800">
-                    {parsedLink.latitude && parsedLink.longitude ? (
-                      <p>
-                        <span className="font-medium">Detected:</span>{' '}
-                        {parsedLink.label ? `${parsedLink.label} — ` : ''}
-                        {parsedLink.latitude}, {parsedLink.longitude}
-                      </p>
-                    ) : parsedLink.address ? (
-                      <p><span className="font-medium">Detected:</span> {parsedLink.address}</p>
-                    ) : (
-                      <p><span className="font-medium">Link ready</span> — Opens in your device&apos;s maps app</p>
-                    )}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <div>
-                  <label className={labelClassName}>Map Provider</label>
-                  <div className="relative">
-                    <select
-                      className={`${inputClassName} appearance-none`}
-                      value={String(qrData.mapProvider || MapProvider.GEO)}
-                      onChange={(e) => handleDataChange('mapProvider', e.target.value)}
-                    >
-                      {MAP_PROVIDERS.map((provider) => (
-                        <option key={provider.value} value={provider.value}>
-                          {provider.label}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
-
-                {locationMode === 'coordinates' ? (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className={labelClassName}>Latitude</label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          className={inputClassName}
-                          placeholder="28.6139"
-                          value={String(qrData.latitude || '')}
-                          onChange={(e) => handleDataChange('latitude', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className={labelClassName}>Longitude</label>
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          className={inputClassName}
-                          placeholder="77.2090"
-                          value={String(qrData.longitude || '')}
-                          onChange={(e) => handleDataChange('longitude', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelClassName}>Place Label (Optional)</label>
-                      <input
-                        type="text"
-                        className={inputClassName}
-                        placeholder="India Gate, New Delhi"
-                        value={String(qrData.label || '')}
-                        onChange={(e) => handleDataChange('label', e.target.value)}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div>
-                    <label className={labelClassName}>Address or Place Name</label>
-                    <input
-                      type="text"
-                      className={inputClassName}
-                      placeholder="1600 Amphitheatre Parkway, Mountain View, CA"
-                      value={String(qrData.address || '')}
-                      onChange={(e) => handleDataChange('address', e.target.value)}
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className={labelClassName}>Zoom Level (Optional)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={20}
-                    className={inputClassName}
-                    placeholder="16"
-                    value={String(qrData.zoom || '16')}
-                    onChange={(e) => handleDataChange('zoom', e.target.value)}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Used by OpenStreetMap and Bing Maps</p>
-                </div>
-              </>
-            )}
-          </div>
-        )
-      }
-
-      default:
-        return null
+  const handleCopy = async () => {
+    if (!canvasRef.current) return
+    try {
+      canvasRef.current.toBlob(async (blob) => {
+        if (!blob) return
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      })
+    } catch {
+      // Fallback: copy content string
+      await navigator.clipboard.writeText(formatQRContent())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
   }
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-      className="w-full"
-    >
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* QR Builder Form - Left Side */}
-        <motion.div 
-          initial={{ opacity: 0, x: -30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="lg:col-span-4 space-y-6"
-        >
-          {/* QR Type Selection */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
-            <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 mb-3">QR Type</label>
-              <div className="relative">
-                <select
-                  className="w-full p-4 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                  value={selectedType}
-                  onChange={(e) => {
-                    const newType = e.target.value as QRType
-                    setSelectedType(newType)
-                    if (newType === QRType.MAPS) {
-                      setQrData(prev => ({ ...prev, locationMode: prev.locationMode || 'link' }))
-                    }
-                  }}
-                >
-                  {QR_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
+    <div className="w-full">
+      {/* Hidden processing canvas */}
+      <canvas ref={canvasRef} className="hidden" />
+
+      {/* ── MAIN STUDIO WORKBENCH (3 COLUMNS) ────────────────────── */}
+      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xl overflow-hidden">
+        
+        {/* Top Header bar with Undo/Redo & Download */}
+        <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              Live QR Studio
+            </span>
           </div>
 
-          {/* Data Input Form */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={selectedType}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50"
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setStyle(DEFAULT_STYLE)
+                setLogoImage(null)
+              }}
+              title="Reset Style"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
             >
-              {renderDataForm()}
-            </motion.div>
-          </AnimatePresence>
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => void renderCode()}
+              title="Refresh Render"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
 
-          {/* Customization - Colors */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
-            <h3 className="text-sm font-medium text-gray-700 mb-4">Colors & Gradients</h3>
-            <div className="space-y-4">
-              <div className="flex space-x-4">
-                <div className="flex-1">
-                  <label className="block text-xs text-gray-600 mb-2">Foreground</label>
-                  <input
-                    type="color"
-                    className="w-full h-12 border-2 border-gray-200 rounded-2xl cursor-pointer"
-                    value={style.foregroundColor}
-                    onChange={(e) => handleStyleChange('foregroundColor', e.target.value)}
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs text-gray-600 mb-2">Background</label>
-                  <input
-                    type="color"
-                    className="w-full h-12 border-2 border-gray-200 rounded-2xl cursor-pointer"
-                    value={style.backgroundColor}
-                    onChange={(e) => handleStyleChange('backgroundColor', e.target.value)}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-xs text-gray-600 mb-2">Gradient Type</label>
-                <div className="relative">
-                  <select
-                    className="w-full p-3 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                    value={style.gradientType}
-                    onChange={(e) => handleStyleChange('gradientType', e.target.value)}
+            <div className="h-4 w-px bg-slate-200 mx-1" />
+
+            {/* Format toggle */}
+            <div className="flex bg-slate-200/80 p-0.5 rounded-lg text-[11px] font-bold">
+              {(['png', 'svg', 'pdf'] as const).map(fmt => (
+                <button
+                  key={fmt}
+                  onClick={() => setDownloadFormat(fmt)}
+                  className={`px-2 py-1 rounded uppercase transition-all ${
+                    downloadFormat === fmt ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {fmt}
+                </button>
+              ))}
+            </div>
+
+            {/* Download CTA */}
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-[#0f172a] hover:bg-black text-white text-xs font-bold rounded-lg shadow-sm transition-all cursor-pointer"
+            >
+              <span>Download</span>
+              <ArrowRight className="h-3.5 w-3.5 stroke-[2.5]" />
+            </button>
+          </div>
+        </div>
+
+        {/* 3-Column Studio Body */}
+        <div className="grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+          
+          {/* ── 1. TYPE SELECTOR SIDEBAR (3 cols) ────────────────────── */}
+          <div className="md:col-span-3 p-4 bg-slate-50/40">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 mb-2">
+              Select Payload
+            </p>
+            <div className="space-y-1">
+              {EXTENDED_TYPES.map((t) => {
+                const Icon = t.icon
+                const isSelected = activeTypeId === t.id
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveTypeId(t.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#ede9fe] text-[#6d28d9] shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                    }`}
                   >
-                    <option value="none">Solid Color</option>
-                    <option value="linear">Linear Gradient</option>
-                    <option value="radial">Radial Gradient</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-              
-              {style.gradientType !== 'none' && (
-                <div>
-                  <label className="block text-xs text-gray-600 mb-2">Gradient Color</label>
-                  <input
-                    type="color"
-                    className="w-full h-12 border-2 border-gray-200 rounded-2xl cursor-pointer"
-                    value={style.gradientColor || '#3b82f6'}
-                    onChange={(e) => handleStyleChange('gradientColor', e.target.value)}
-                  />
-                </div>
-              )}
+                    <Icon className={`h-4 w-4 shrink-0 ${isSelected ? 'text-[#6d28d9]' : 'text-slate-400'}`} />
+                    <span className="truncate">{t.label}</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
-          {/* Customization - Shape & Pattern */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
-            <h3 className="text-sm font-medium text-gray-700 mb-4">Shape & Pattern</h3>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-2">Dot Style</label>
-                  <div className="relative">
-                    <select
-                      className="w-full p-3 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
-                      value={style.dotStyle}
-                      onChange={(e) => handleStyleChange('dotStyle', e.target.value)}
-                    >
-                      <option value="square">Square</option>
-                      <option value="rounded">Rounded</option>
-                      <option value="dots">Dots</option>
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-xs text-gray-600 mb-2">Corner Style</label>
-                  <div className="relative">
-                    <select
-                      className="w-full p-3 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
-                      value={style.cornerStyle}
-                      onChange={(e) => handleStyleChange('cornerStyle', e.target.value)}
-                    >
-                      <option value="square">Square</option>
-                      <option value="rounded">Rounded</option>
-                      <option value="extra-rounded">Extra Rounded</option>
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" />
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-xs text-gray-600 mb-2">Pattern Style</label>
-                <div className="relative">
-                  <select
-                    className="w-full p-3 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                    value={style.pattern}
-                    onChange={(e) => handleStyleChange('pattern', e.target.value)}
-                  >
-                    <option value="default">Default</option>
-                    <option value="dots">Dots</option>
-                    <option value="squares">Squares</option>
-                    <option value="rounded">Rounded</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-xs text-gray-600 mb-2">Corner Radius: {style.cornerRadius || 0}px</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="20"
-                  step="1"
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                  value={style.cornerRadius || 0}
-                  onChange={(e) => handleStyleChange('cornerRadius', parseInt(e.target.value))}
-                />
-              </div>
+          {/* ── 2. CONTENT FORM (5 cols) ─────────────────────────────── */}
+          <div className="md:col-span-5 p-6 space-y-5">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">{activeTypeItem.label}</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {activeTypeItem.description || `Enter the ${activeTypeItem.label.toLowerCase()} details you want to link to.`}
+              </p>
             </div>
-          </div>
 
-          {/* Customization - Size & Quality */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
-            <h3 className="text-sm font-medium text-gray-700 mb-4">Size & Quality</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-2">Error Correction</label>
-                <div className="relative">
-                  <select
-                    className="w-full p-3 bg-white border border-gray-200 rounded-2xl appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                    value={style.errorCorrectionLevel}
-                    onChange={(e) => handleStyleChange('errorCorrectionLevel', e.target.value)}
-                  >
-                    <option value="L">Low (7%)</option>
-                    <option value="M">Medium (15%)</option>
-                    <option value="Q">Quartile (25%)</option>
-                    <option value="H">High (30%)</option>
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Higher levels can recover from more damage but create denser codes</p>
-              </div>
-              
+            {/* URL & Common Links */}
+            {(activeTypeId === 'website' || activeTypeId === 'social' || activeTypeId === 'pdf' || activeTypeId === 'app' || activeTypeId === 'menu') && (
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-2">Size: {style.size}px</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">URL</label>
                   <input
-                    type="range"
-                    min="128"
-                    max="512"
-                    step="8"
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    value={style.size}
-                    onChange={(e) => handleStyleChange('size', parseInt(e.target.value))}
+                    type="url"
+                    placeholder={activeTypeItem.placeholder}
+                    value={String(qrData.url || '')}
+                    onChange={(e) => handleDataChange('url', e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all outline-none"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-xs text-gray-600 mb-2">Margin: {style.margin}</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Name (optional)</label>
                   <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    step="1"
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    value={style.margin}
-                    onChange={(e) => handleStyleChange('margin', parseInt(e.target.value))}
+                    type="text"
+                    placeholder="e.g. My Website"
+                    value={String(qrData.name || '')}
+                    onChange={(e) => handleDataChange('name', e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all outline-none"
                   />
                 </div>
               </div>
-            </div>
-          </div>
+            )}
 
-          {/* Logo Upload */}
-          <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
-            <h3 className="text-sm font-medium text-gray-700 mb-4">Logo (Optional)</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-gray-600 mb-2">Logo URL</label>
-                <input
-                  type="url"
-                  className="w-full p-3 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 placeholder-gray-400 text-sm"
-                  placeholder="https://example.com/logo.png"
-                  value={style.logoUrl || ''}
-                  onChange={(e) => handleStyleChange('logoUrl', e.target.value)}
+            {/* Plain Text */}
+            {(activeTypeId === 'text' || activeTypeId === 'more') && (
+              <div className="space-y-3">
+                <label className="block text-xs font-semibold text-slate-700">Message / Text</label>
+                <textarea
+                  rows={4}
+                  placeholder={activeTypeItem.placeholder}
+                  value={String(qrData.text || '')}
+                  onChange={(e) => handleDataChange('text', e.target.value)}
+                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all outline-none resize-none"
                 />
-                <p className="text-xs text-gray-500 mt-1">Add a logo to the center of your QR code</p>
               </div>
-              
-              {style.logoUrl && (
+            )}
+
+            {/* Wi-Fi Form */}
+            {activeTypeId === 'wifi' && (
+              <div className="space-y-3">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-2">Logo Size: {style.logoSize || 40}px</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Network Name (SSID)</label>
                   <input
-                    type="range"
-                    min="20"
-                    max="80"
-                    step="5"
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    value={style.logoSize || 40}
-                    onChange={(e) => handleStyleChange('logoSize', parseInt(e.target.value))}
+                    type="text"
+                    placeholder="Office_Guest"
+                    value={String(qrData.ssid || '')}
+                    onChange={(e) => handleDataChange('ssid', e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 outline-none"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showWifiPassword ? 'text' : 'password'}
+                      placeholder="Password"
+                      value={String(qrData.password || '')}
+                      onChange={(e) => handleDataChange('password', e.target.value)}
+                      className="w-full pl-3.5 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowWifiPassword(!showWifiPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      {showWifiPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Contact vCard Form */}
+            {activeTypeId === 'vcard' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="Alex Morgan"
+                    value={String(qrData.name || '')}
+                    onChange={(e) => handleDataChange('name', e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Phone"
+                    value={String(qrData.phone || '')}
+                    onChange={(e) => handleDataChange('phone', e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 outline-none"
+                  />
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={String(qrData.email || '')}
+                    onChange={(e) => handleDataChange('email', e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Email Form */}
+            {activeTypeId === 'email' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Recipient Email</label>
+                  <input
+                    type="email"
+                    placeholder="hello@company.com"
+                    value={String(qrData.email || '')}
+                    onChange={(e) => handleDataChange('email', e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Subject</label>
+                  <input
+                    type="text"
+                    placeholder="Inquiry"
+                    value={String(qrData.subject || '')}
+                    onChange={(e) => handleDataChange('subject', e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Phone Form */}
+            {activeTypeId === 'phone' && (
+              <div className="space-y-3">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+                <input
+                  type="tel"
+                  placeholder="+1 (555) 000-0000"
+                  value={String(qrData.phone || '')}
+                  onChange={(e) => handleDataChange('phone', e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 outline-none"
+                />
+              </div>
+            )}
+
+            {/* Location Form */}
+            {activeTypeId === 'location' && (
+              <div className="space-y-3">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Location or Maps Link</label>
+                <input
+                  type="text"
+                  placeholder="https://maps.app.goo.gl/... or coordinates"
+                  value={String(qrData.mapLink || '')}
+                  onChange={(e) => handleDataChange('mapLink', e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 outline-none"
+                />
+              </div>
+            )}
+
+            {/* Dynamic QR Toggle */}
+            <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="h-6 w-6 rounded-lg bg-purple-100 text-purple-700 grid place-items-center">
+                  <Sparkles className="h-3.5 w-3.5" />
+                </span>
+                <div>
+                  <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                    <span>Make it dynamic</span>
+                    <span className="text-amber-500">✨</span>
+                  </p>
+                  <p className="text-[10px] text-slate-500">Edit this URL anytime without reprinting.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDynamic(!isDynamic)}
+                className={`w-9 h-5 rounded-full p-0.5 transition-colors cursor-pointer ${
+                  isDynamic ? 'bg-purple-600' : 'bg-slate-300'
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full bg-white transition-transform ${
+                    isDynamic ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Advanced Options accordion */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1"
+              >
+                <span>Advanced options</span>
+                <ChevronDown className={`h-3 w-3 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showAdvanced && (
+                <div className="mt-3 p-3 bg-slate-50 rounded-xl space-y-3 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Frame Title Text</label>
+                    <input
+                      type="text"
+                      value={String(qrData.frameText || '')}
+                      onChange={(e) => handleDataChange('frameText', e.target.value)}
+                      placeholder="Scan to visit"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Error Correction Level</label>
+                    <div className="flex gap-1.5">
+                      {(['L', 'M', 'Q', 'H'] as const).map(lvl => (
+                        <button
+                          key={lvl}
+                          type="button"
+                          onClick={() => handleStyleChange('errorCorrectionLevel', lvl)}
+                          className={`flex-1 py-1 rounded text-[11px] font-semibold transition-all ${
+                            style.errorCorrectionLevel === lvl ? 'bg-purple-600 text-white' : 'bg-white border text-slate-600'
+                          }`}
+                        >
+                          {lvl}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
+
           </div>
 
-          {/* Generate Button */}
-          <motion.button
-            whileHover={{ scale: 1.02, y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => void generateQR()}
-            disabled={isGenerating}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-4 px-6 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transition-all duration-200"
-          >
-            {isGenerating ? (
-              <>
-                <RefreshCw size={20} className="animate-spin" />
-                <span>Generating...</span>
-              </>
-            ) : (
-              <span>Generate QR Code</span>
-            )}
-          </motion.button>
-        </motion.div>
+          {/* ── 3. LIVE PREVIEW & DESIGN CONTROLS (4 cols) ──────────── */}
+          <div className="md:col-span-4 p-5 bg-slate-50/30 flex flex-col justify-between space-y-4">
+            
+            {/* Style Subtabs */}
+            <div className="flex bg-slate-100 p-0.5 rounded-xl text-xs font-bold">
+              {(['style', 'frame', 'logo', 'colors'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setStyleTab(tab)}
+                  className={`flex-1 py-1.5 rounded-lg capitalize transition-all ${
+                    styleTab === tab
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
 
-        {/* QR Code Preview - Center */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="lg:col-span-4" 
-          data-qr-preview
-        >
-          <div className="sticky top-24">
-            {qrImageUrl ? (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, type: "spring", bounce: 0.3 }}
-                className="text-center"
-              >
-                <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-2xl border border-gray-200/50">
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    transition={{ duration: 0.2 }}
-                    className="inline-block p-4 bg-white rounded-2xl shadow-lg"
-                  >
-                    <img 
-                      src={qrImageUrl}
-                      alt="Generated QR Code"
-                      className="mx-auto rounded-xl"
-                      style={{ width: style.size, height: style.size }}
-                    />
-                  </motion.div>
-                  
-                  <div className="flex justify-center space-x-4 mt-8">
-                    <motion.button
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={downloadQR}
-                      className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-2xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-                    >
-                      <Download size={18} />
-                      <span>Download</span>
-                    </motion.button>
-                    
-                    <motion.button
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={copyQRData}
-                      className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-gray-600 to-slate-600 hover:from-gray-700 hover:to-slate-700 text-white rounded-2xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-                    >
-                      <Copy size={18} />
-                      <span>Copy</span>
-                    </motion.button>
+            {/* Tab: Style (Pattern & Corners) */}
+            {styleTab === 'style' && (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Pattern</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      { id: 'square', label: 'Square' },
+                      { id: 'rounded', label: 'Rounded' },
+                      { id: 'dots', label: 'Dots' },
+                    ].map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => handleStyleChange('dotStyle', p.id as 'square' | 'rounded' | 'dots')}
+                        className={`p-2 rounded-lg border text-center transition-all cursor-pointer ${
+                          style.dotStyle === p.id
+                            ? 'border-purple-600 bg-purple-50 text-purple-700 font-bold'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="text-[10px] block truncate">{p.label}</span>
+                      </button>
+                    ))}
                   </div>
-                  
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="mt-6 p-4 bg-gray-50/80 backdrop-blur-sm rounded-2xl text-left border border-gray-200/50"
-                  >
-                    <h4 className="font-medium text-gray-800 mb-3 flex items-center">
-                      <Check className="h-4 w-4 text-green-600 mr-2" />
-                      QR Code Details
-                    </h4>
-                    <div className="space-y-1 text-sm text-gray-600">
-                      <p><span className="font-medium">Type:</span> {selectedType}</p>
-                      <p><span className="font-medium">Size:</span> {style.size} × {style.size}px</p>
-                      <p><span className="font-medium">Content:</span> {formatQRContent().substring(0, 40)}{formatQRContent().length > 40 ? '...' : ''}</p>
-                    </div>
-                  </motion.div>
                 </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center"
-              >
-                <div className="bg-white/50 backdrop-blur-sm rounded-3xl p-16 border-2 border-dashed border-gray-300">
-                  <motion.div
-                    animate={{ y: [0, -10, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                    className="text-8xl mb-6"
-                  >
-                    📱
-                  </motion.div>
-                  <h3 className="text-2xl font-semibold text-gray-700 mb-2">QR Code Preview</h3>
-                  <p className="text-gray-500">Fill in the details and generate your QR code</p>
-                </div>
-              </motion.div>
-            )}
-          </div>
-        </motion.div>
 
-        {/* Right Sidebar - Advanced Features */}
-        <motion.div 
-          initial={{ opacity: 0, x: 30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-          className="lg:col-span-4 space-y-6"
-        >
-          <div className="sticky top-24 space-y-6">
-            {/* QR History */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
-              <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                Recent QR Codes
-              </h3>
-            <div className="space-y-3">
-              {recentQRCodes.length === 0 && (
-                <p className="text-xs text-gray-500">No recent QR codes yet.</p>
-              )}
-              {recentQRCodes.map((qr) => (
-                <div key={qr.id} className="flex items-center justify-between p-3 bg-gray-50/50 rounded-2xl hover:bg-gray-100/50 transition-colors">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-lg overflow-hidden flex items-center justify-center">
-                      {qr.image_url ? (
-                        <img src={qr.image_url} alt="qr" className="w-8 h-8 object-cover" />
-                      ) : (
-                        <span className="text-xs">QR</span>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">{qr.type}</p>
-                      <p className="text-xs text-gray-500">{new Date(qr.created_at || Date.now()).toLocaleString()}</p>
-                    </div>
+                <div>
+                  <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Corners</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: 'square', label: 'Square' },
+                      { id: 'rounded', label: 'Rounded' },
+                      { id: 'extra-rounded', label: 'Circle' },
+                    ].map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => handleStyleChange('cornerStyle', c.id as 'square' | 'rounded' | 'extra-rounded')}
+                        className={`p-2 rounded-lg border text-center transition-all cursor-pointer ${
+                          style.cornerStyle === c.id
+                            ? 'border-purple-600 bg-purple-50 text-purple-700 font-bold'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="text-[10px] block truncate">{c.label}</span>
+                      </button>
+                    ))}
                   </div>
-                  {qr.image_url && (
+                </div>
+              </div>
+            )}
+
+            {/* Tab: Colors */}
+            {(styleTab === 'colors' || styleTab === 'style') && (
+              <div>
+                <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Colors</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {COLOR_SWATCHES.map(color => (
                     <button
-                      className="text-gray-400 hover:text-blue-500 transition-colors"
-                      onClick={() => {
-                        const link = document.createElement('a')
-                        link.href = qr.image_url as string
-                        link.download = 'qr-code.png'
-                        document.body.appendChild(link)
-                        link.click()
-                        document.body.removeChild(link)
-                      }}
+                      key={color}
+                      onClick={() => handleStyleChange('foregroundColor', color)}
+                      className={`h-6 w-6 rounded-full border border-black/10 transition-transform cursor-pointer ${
+                        style.foregroundColor === color ? 'scale-125 ring-2 ring-purple-600 ring-offset-1' : 'hover:scale-110'
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tab: Frame */}
+            {styleTab === 'frame' && (
+              <div className="space-y-2">
+                <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Frame Label</p>
+                <input
+                  type="text"
+                  placeholder="Scan to visit"
+                  value={String(qrData.frameText || '')}
+                  onChange={(e) => handleDataChange('frameText', e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                />
+              </div>
+            )}
+
+            {/* Tab: Logo */}
+            {styleTab === 'logo' && (
+              <div className="space-y-3">
+                <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Center Logo</p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={logoInputRef}
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => logoInputRef.current?.click()}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 px-3 border border-dashed border-slate-300 hover:border-purple-500 rounded-xl text-xs font-semibold text-slate-700 bg-white cursor-pointer"
+                  >
+                    <Upload className="h-3.5 w-3.5 text-purple-600" />
+                    <span>{logoImage ? 'Change Logo' : 'Upload Logo'}</span>
+                  </button>
+
+                  {logoImage && (
+                    <button
+                      onClick={() => setLogoImage(null)}
+                      className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg text-xs"
+                      title="Remove Logo"
                     >
-                      <Download size={14} />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   )}
                 </div>
-              ))}
-              <button className="w-full text-center py-2 text-xs text-blue-600 hover:text-blue-700 transition-colors">
-                View all history
+              </div>
+            )}
+
+            {/* ── THE LIVE QR PREVIEW CARD (MATCHING REFERENCE IMAGE) ── */}
+            <div className="py-2 flex items-center justify-center">
+              <div className="w-full max-w-[220px] bg-white rounded-2xl p-4 shadow-lg border border-slate-100 text-center">
+                <div className="p-2 bg-white rounded-xl mx-auto flex items-center justify-center">
+                  {qrImageUrl ? (
+                    <img
+                      src={qrImageUrl}
+                      alt="Generated QR Code"
+                      className="mx-auto rounded-lg max-w-[150px] h-auto object-contain"
+                    />
+                  ) : (
+                    <div className="h-36 w-36 flex items-center justify-center text-slate-300">
+                      <RefreshCw className="h-6 w-6 animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Frame Text label underneath code */}
+                <div className="mt-2 text-center">
+                  <p className="text-xs font-bold text-slate-800 truncate">
+                    {String(qrData.frameText || 'Scan to visit')}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Copy button */}
+            <div className="pt-2">
+              <button
+                onClick={handleCopy}
+                className="w-full py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 shadow-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5 text-slate-400" />}
+                <span>{copied ? 'Copied to Clipboard!' : 'Copy to Clipboard'}</span>
               </button>
             </div>
-            </div>
 
-            {/* Quick Templates */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
-              <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                Quick Templates
-              </h3>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => {
-                    setSelectedType(QRType.MAPS)
-                    setQrData({
-                      locationMode: 'link',
-                      mapLink: 'https://www.google.com/maps/place/India+Gate/@28.612912,77.2295107,17z',
-                      mapProvider: MapProvider.GEO,
-                    })
-                  }}
-                  className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-2xl hover:from-red-100 hover:to-red-200 transition-all duration-200 text-center group">
-                  <div className="text-2xl mb-2">📍</div>
-                  <p className="text-xs font-medium text-gray-700">Maps</p>
-                  <p className="text-xs text-gray-500">Share Location</p>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setSelectedType(QRType.URL)
-                    setQrData({ url: 'https://example.com' })
-                    setStyle((s) => ({ ...s, foregroundColor: '#0f172a', backgroundColor: '#ffffff' }))
-                  }}
-                  className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl hover:from-blue-100 hover:to-blue-200 transition-all duration-200 text-center group">
-                  <div className="text-2xl mb-2">🌐</div>
-                  <p className="text-xs font-medium text-gray-700">Website</p>
-                  <p className="text-xs text-gray-500">Quick URL</p>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    setSelectedType(QRType.EMAIL)
-                    setQrData({ email: 'hello@example.com', subject: 'Hello', body: 'Hi there!' })
-                  }}
-                  className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-2xl hover:from-green-100 hover:to-green-200 transition-all duration-200 text-center group">
-                  <div className="text-2xl mb-2">📧</div>
-                  <p className="text-xs font-medium text-gray-700">Email</p>
-                  <p className="text-xs text-gray-500">Contact Me</p>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    setSelectedType(QRType.WIFI)
-                    setQrData({ ssid: 'MyWiFi', password: 'password123', security: 'WPA', hidden: false })
-                  }}
-                  className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl hover:from-purple-100 hover:to-purple-200 transition-all duration-200 text-center group">
-                  <div className="text-2xl mb-2">📶</div>
-                  <p className="text-xs font-medium text-gray-700">WiFi</p>
-                  <p className="text-xs text-gray-500">Share Network</p>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    setSelectedType(QRType.VCARD)
-                    setQrData({ name: 'John Doe', organization: 'Company', phone: '+1 234 567 8900', email: 'john@example.com', website: 'https://example.com' })
-                  }}
-                  className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl hover:from-orange-100 hover:to-orange-200 transition-all duration-200 text-center group">
-                  <div className="text-2xl mb-2">👤</div>
-                  <p className="text-xs font-medium text-gray-700">vCard</p>
-                  <p className="text-xs text-gray-500">Business Card</p>
-                </button>
-              </div>
-            </div>
-
-            {/* Batch Generator */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
-              <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center">
-                <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                Batch Generator
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-2">Upload CSV File</label>
-                  <label className="block border-2 border-dashed border-gray-300 rounded-2xl p-4 text-center hover:border-blue-400 transition-colors cursor-pointer">
-                    <input
-                      type="file"
-                      accept=".csv,text/csv"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        const text = await file.text()
-                        // Simple CSV parse: type,content
-                        const rows = text.split(/\r?\n/).filter(Boolean)
-                        let created = 0
-                        for (const row of rows) {
-                          const [type, content] = row.split(',')
-                          if (!type || !content) continue
-                          try {
-                            const dataUrl = await QRCode.toDataURL(content, {
-                              width: style.size,
-                              margin: style.margin,
-                              color: { dark: style.foregroundColor, light: style.backgroundColor },
-                              errorCorrectionLevel: style.errorCorrectionLevel
-                            })
-                            await dbOperations.createQRCode({
-                              type: type.trim(),
-                              content: content.trim(),
-                              data: {},
-                              style: style as unknown as Record<string, unknown>,
-                              image_url: dataUrl
-                            }, user?.id)
-                            created++
-                          } catch (err) {
-                            console.warn('Failed to create QR from CSV row:', row, err)
-                          }
-                        }
-                        alert(`Created ${created} QR codes from CSV`)
-                        fetchRecent()
-                      }}
-                    />
-                    <div className="text-2xl mb-2">📁</div>
-                    <p className="text-sm text-gray-600">Drop CSV file here</p>
-                    <p className="text-xs text-gray-500">or click to browse</p>
-                  </label>
-                </div>
-                
-                <button className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-medium py-3 px-4 rounded-2xl transition-all duration-200 text-sm">
-                  Generate Batch QRs
-                </button>
-              </div>
-            </div>
-
-            {/* Export Options */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
-              <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center">
-                <div className="w-2 h-2 bg-orange-500 rounded-full mr-2"></div>
-                Export Options
-              </h3>
-              <div className="space-y-3">
-                <button
-                  onClick={async () => {
-                    const content = formatQRContent()
-                    if (!content) return alert('Generate a QR first')
-                    // Lazy import jsPDF to avoid bundling cost
-                    const { jsPDF } = await import('jspdf')
-                    const doc = new jsPDF({ unit: 'px', format: [style.size + 64, style.size + 64] })
-                    const img = qrImageUrl
-                    if (!img) return alert('Generate a QR first')
-                    doc.addImage(img, 'PNG', 32, 32, style.size, style.size)
-                    doc.save('qr-code.pdf')
-                  }}
-                  className="w-full flex items-center justify-center space-x-2 p-3 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-colors text-sm">
-                  <span>📄</span>
-                  <span>Export as PDF</span>
-                </button>
-                
-                <button
-                  onClick={async () => {
-                    const content = formatQRContent()
-                    if (!content) return alert('Generate a QR first')
-                    const svgString = await QRCode.toString(content, {
-                      type: 'svg',
-                      width: style.size,
-                      margin: style.margin,
-                      color: { dark: style.foregroundColor, light: style.backgroundColor },
-                      errorCorrectionLevel: style.errorCorrectionLevel
-                    })
-                    const blob = new Blob([svgString], { type: 'image/svg+xml' })
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = 'qr-code.svg'
-                    document.body.appendChild(a)
-                    a.click()
-                    document.body.removeChild(a)
-                    URL.revokeObjectURL(url)
-                  }}
-                  className="w-full flex items-center justify-center space-x-2 p-3 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-colors text-sm">
-                  <span>🖼️</span>
-                  <span>Export as SVG</span>
-                </button>
-                
-                <button
-                  onClick={async () => {
-                    if (!qrImageUrl) return alert('Generate a QR first')
-                    alert('Analytics export would include scan data from Supabase (stub).')
-                  }}
-                  className="w-full flex items-center justify-center space-x-2 p-3 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-colors text-sm">
-                  <span>📊</span>
-                  <span>Export with Analytics</span>
-                </button>
-              </div>
-            </div>
-
-            {/* QR Analytics Preview */}
-            <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-gray-200/50">
-              <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center">
-                <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
-                QR Analytics
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Total Scans</span>
-                  <span className="text-lg font-bold text-blue-600">247</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">This Week</span>
-                  <span className="text-lg font-bold text-green-600">42</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Success Rate</span>
-                  <span className="text-lg font-bold text-purple-600">94%</span>
-                </div>
-                
-                <div className="mt-4 pt-3 border-t border-gray-200">
-                  <button className="text-xs text-blue-600 hover:text-blue-700 transition-colors">
-                    View detailed analytics →
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
-        </motion.div>
+
+        </div>
+
       </div>
-      
-      {/* Hidden canvas for QR generation */}
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
-    </motion.div>
+    </div>
   )
 }

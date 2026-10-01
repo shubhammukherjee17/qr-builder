@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Caveat } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,9 +12,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const caveat = Caveat({
+  variable: "--font-caveat",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
-  title: "QRBuilder - Generate Professional QR Codes for Everything",
-  description: "Create custom QR codes for URLs, data, and images with our intuitive platform. Fast, flexible, and future-ready for businesses and individuals.",
+  title: "Qraft — Create Beautiful QR Codes for Anything",
+  description: "Generate, customize and download high-quality QR codes instantly — completely free. No account, no watermark, no restrictions.",
 };
 
 export default function RootLayout({
@@ -25,10 +30,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${caveat.variable} antialiased selection:bg-purple-200 selection:text-purple-950`}
       >
         {children}
       </body>
     </html>
-  )
+  );
 }

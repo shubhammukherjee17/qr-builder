@@ -100,17 +100,17 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-[#f4f1ea] px-4">
+      <Card className="w-full max-w-md rounded-3xl border-neutral-900/5 shadow-[0_1px_2px_rgba(23,23,23,0.04),0_24px_48px_-24px_rgba(23,23,23,0.25)]">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="p-3 rounded-full bg-blue-100">
-              <QrCode className="h-8 w-8 text-blue-600" />
+            <div className="grid place-items-center h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm shadow-violet-500/30">
+              <QrCode className="h-7 w-7" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">QR Builder</CardTitle>
+          <CardTitle className="text-2xl font-bold">Qraft</CardTitle>
           <CardDescription>
-            Sign in to your account or create a new one to start building QR codes
+            The free QR design studio — sign in or create an account to save your QR codes
           </CardDescription>
         </CardHeader>
         

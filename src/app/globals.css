@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fbf9f5;
+  --foreground: #0f172a;
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
 }
 
 @theme inline {
@@ -10,130 +12,160 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-handwriting: var(--font-caveat);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  background-color: #faf7f2;
+  color: #0f172a;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
-/* Smooth scrolling for anchor links */
+.font-handwriting {
+  font-family: var(--font-caveat), cursive, sans-serif;
+}
+
+::selection {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
 html {
   scroll-behavior: smooth;
 }
 
+/* ── ARTISTIC MAXIMALIST COLLAGE BACKGROUND ─────────────────── */
+.collage-bg {
+  position: relative;
+  background-color: #faf7f2;
+  background-image: 
+    radial-gradient(ellipse at 5% 15%, rgba(253, 224, 71, 0.35) 0%, transparent 40%),
+    radial-gradient(ellipse at 95% 10%, rgba(244, 114, 182, 0.35) 0%, transparent 45%),
+    radial-gradient(ellipse at 90% 40%, rgba(56, 189, 248, 0.3) 0%, transparent 40%),
+    radial-gradient(ellipse at 10% 50%, rgba(167, 139, 250, 0.3) 0%, transparent 45%),
+    radial-gradient(ellipse at 85% 75%, rgba(251, 191, 36, 0.3) 0%, transparent 40%),
+    radial-gradient(ellipse at 15% 90%, rgba(52, 211, 153, 0.25) 0%, transparent 45%);
+}
+
+/* Doodle & tape styles */
+.tape-strip {
+  background: rgba(254, 240, 138, 0.7);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  border-left: 2px dashed rgba(202, 138, 4, 0.3);
+  border-right: 2px dashed rgba(202, 138, 4, 0.3);
+}
+
+.tape-strip-pink {
+  background: rgba(251, 207, 232, 0.75);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* Clean Card Styles floating over collage */
+.qraft-card {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.qraft-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.09), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
+}
+
+/* Pill Badges */
+.qraft-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.3rem 0.8rem;
+  border-radius: 9999px;
+}
+
+.qraft-pill-yellow {
+  background-color: #fef08a;
+  color: #713f12;
+  border: 1px solid #fde047;
+}
+
+.qraft-pill-purple {
+  background-color: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+
+.qraft-pill-pink {
+  background-color: #fce7f3;
+  color: #9d174d;
+  border: 1px solid #fbcfe8;
+}
+
+/* Buttons */
+.btn-qraft-primary {
+  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+  color: #ffffff;
+  font-weight: 700;
+  border-radius: 9999px;
+  padding: 0.7rem 1.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-qraft-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.45);
+  background: linear-gradient(135deg, #6d28d9 0%, #4f46e5 100%);
+}
+
+.btn-qraft-secondary {
+  background: #ffffff;
+  color: #1e293b;
+  font-weight: 600;
+  border-radius: 9999px;
+  padding: 0.7rem 1.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-qraft-secondary:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #faf7f2;
 }
 
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 3px;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
-
-/* Focus styles */
-.focus\:ring-2:focus {
-  outline: 2px solid transparent;
-  outline-offset: 2px;
-  box-shadow: 0 0 0 2px #3b82f6;
-}
-
-/* Animation classes */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.animate-fadeInUp {
-  animation: fadeInUp 0.6s ease-out;
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-out;
-}
-
-/* Text shadow utilities */
-.text-shadow {
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.text-shadow-lg {
-  text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.7);
-}
-
-.text-shadow-sm {
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-/* Custom slider styles */
-.slider::-webkit-slider-thumb {
-  appearance: none;
-  height: 20px;
-  width: 20px;
-  border-radius: 50%;
-  background: linear-gradient(45deg, #3b82f6, #6366f1);
-  cursor: pointer;
-  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
-  transition: all 0.2s ease;
-}
-
-.slider::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4);
-}
-
-.slider::-moz-range-thumb {
-  height: 20px;
-  width: 20px;
-  border-radius: 50%;
-  background: linear-gradient(45deg, #3b82f6, #6366f1);
-  cursor: pointer;
-  border: none;
-  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
-}
-
-.slider::-webkit-slider-track {
-  background: #e5e7eb;
-  border-radius: 8px;
-  height: 8px;
-}
-
-.slider::-moz-range-track {
-  background: #e5e7eb;
-  border-radius: 8px;
-  height: 8px;
-  border: none;
-}
-
