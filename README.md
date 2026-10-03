@@ -1,243 +1,160 @@
-# QR Builder
+# Qraft — Beautiful QR Codes for Anything
 
-A modern, feature-rich QR code generator with stunning 3D animations, extensive customization options, and powerful database integration using Supabase.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/shubhammukherjee17/qr-builder/main/public/favicon.ico" width="48" height="48" alt="Qraft Logo" />
+</p>
+
+<p align="center">
+  <strong>Generate, customize, and download high-quality QR codes in real time — 100% free, no sign up, no watermark.</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-16.2.10-black?style=flat-square&logo=next.js" alt="Next.js" />
+  <img src="https://img.shields.io/badge/React-19.1.0-blue?style=flat-square&logo=react" alt="React" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-v4-38bdf8?style=flat-square&logo=tailwind-css" alt="Tailwind CSS" />
+  <img src="https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
+</p>
+
+---
+
+## 🎨 Visual Identity & Maximalist Aesthetic
+
+Qraft is designed with a **rich, maximalist collage aesthetic**:
+- **Botanical Framing**: Tropical Monstera leaves and palm fronds framing the canvas.
+- **Watercolor Splashes**: Soft, vibrant gouache and watercolor splash blooms (magenta, sunshine yellow, cyan, purple).
+- **Handcrafted Accents**: Washi tape strips, retro stamps, doodle crowns (👑), disco ball sketches (🪩), stars (✦), and arrows (➔).
+- **Handwritten Typography**: Organic annotations using Google Font **Caveat** (`font-handwriting`) paired with clean **Geist** typography.
+- **100% Mobile-Friendly**: Responsive single-column flow on mobile viewports with comfortable touch targets (≥44px), mobile quick preview bar, and guaranteed zero button truncation.
+
+---
 
 ## ✨ Features
 
-### 🎨 **3D Visual Experience**
-- Full-page 3D background with animated QR cube
-- Floating geometric shapes and particle systems
-- Interactive 3D elements throughout the interface
-- Smooth animations using Framer Motion
+### 🛠️ 12 Payload Types
+Create scannable QR codes for any use case:
+1. **Website**: Direct link to any URL (`https://...`).
+2. **Text**: Share plain text, secret notes, or quotes.
+3. **Email**: Pre-filled email with recipient, subject, and body.
+4. **Phone**: Direct telephone dialing (`tel:+...`).
+5. **Wi-Fi**: Automatic network connection with SSID, password, and security type (WPA/WEP/None).
+6. **Location / Maps**: Universal `geo:` URI standard (RFC 5870) and Google Maps links.
+7. **vCard**: Complete digital business card (Name, Organization, Phone, Email, Website).
+8. **Social Media**: Link Instagram, LinkedIn, YouTube, TikTok, and X.
+9. **PDF**: Document and brochure links.
+10. **App Download**: iOS App Store and Google Play store redirection.
+11. **Restaurant Menu**: Contactless digital menu links.
+12. **Custom / More**: Open payload for custom data schemes.
 
-### 🛠️ **QR Code Generation**
-- **8 QR Types**: Text, URL, Email, Phone, SMS, WiFi, vCard, **Location/Maps**
-- **Universal Location QR Codes**:
-  - Paste any Google Maps link - QR generates instantly
-  - Uses **geo: URI standard** - works with **ANY maps app**
-  - **iOS**: Opens in Apple Maps, Google Maps, Waze, or user's choice
-  - **Android**: Opens in Google Maps, Waze, or user's choice
-  - **Desktop**: Opens in default maps app or browser
-  - Works offline with downloaded maps
-  - Better privacy (no tracking redirects)
-- **Advanced Customization**:
-  - Colors & gradients (linear, radial)
-  - Dot styles (square, rounded, dots)
-  - Corner styles (square, rounded, extra-rounded)
-  - Pattern styles and corner radius
-  - Error correction levels (L, M, Q, H)
-  - Logo embedding with size control
+### 🎨 Deep Customization Studio
+- **Patterns**: Choose between **Square**, **Rounded**, and **Dots** module patterns.
+- **Corner Eyes**: Select from **Square**, **Rounded**, and **Circle** finder styles.
+- **Color Palette**: 9 curated brand colors plus a custom **HEX** color picker.
+- **Center Logo**: Upload custom PNG/SVG logo with automatic cutout and error-correction level boost.
+- **Frame & Caption**: Customizable frame text underneath the QR code (e.g., *"Scan to visit My Website"*).
+- **Dynamic Toggle**: Visual indicator for dynamic destination routing.
+- **Advanced Engine**: Fine-tune Quiet Zone margin, resolution size (256px – 1024px), and Error Correction Levels (**L**, **M**, **Q**, **H**).
 
-### 🗄️ **Database Integration (Supabase)**
-- **QR History**: Automatically saves all generated QR codes
-- **Quick Templates**: Pre-configured templates for common use cases
-- **Batch Generation**: Upload CSV files to generate multiple QR codes
-- **Analytics Tracking**: Scan count and performance metrics
-- **Export Options**: PDF, SVG, and analytics reports
+### 📱 Live Scannable Preview & Instant Export
+- **Real-Time HTML5 Canvas**: Updates instantly on every keystroke.
+- **PNG Download**: Crisp, high-resolution raster image.
+- **SVG Export**: Scalable, vector-perfect SVG markup for print flyers and billboards.
+- **PDF Export**: Print-ready formatted PDF document generated with `jsPDF`.
+- **1-Click Clipboard Copy**: Copies image blob directly to clipboard with instant feedback.
+- **Mobile Quick Preview**: Compact top banner on mobile screens allowing immediate download and copy without scrolling.
 
-### 📱 **Export Features**
-- **PNG Download**: High-quality raster images
-- **PDF Export**: Vector-perfect documents using jsPDF
-- **SVG Export**: Scalable vector graphics
-- **Batch Processing**: Generate multiple QR codes from CSV data
+### 📋 Showcase Templates
+Curated, pre-designed templates for instant inspiration:
+- **The Daily Grind**: Coffee Shop & cafe ordering.
+- **Follow Us**: Instagram social follow card.
+- **THE GREEN TABLE**: Organic restaurant menu.
+- **Join Our Wi-Fi**: Contactless guest Wi-Fi connection.
+- **Download Our App**: Mobile app download card with store badges.
+
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ and npm
-- Supabase account (free tier available)
+- [Node.js](https://nodejs.org/) (version 18 or higher)
+- `npm` or `pnpm` or `yarn`
 
-### 1. Clone and Install
+### 1. Clone & Install
 ```bash
 git clone https://github.com/shubhammukherjee17/qr-builder.git
 cd qr-builder
 npm install
 ```
 
-### 2. Supabase Setup
-
-#### Create a Supabase Project
-1. Go to [Supabase](https://supabase.com) and create a new project
-2. Wait for the project to be ready (2-3 minutes)
-
-#### Set up Database
-1. Go to your Supabase project dashboard
-2. Navigate to **SQL Editor**
-3. Copy and paste the contents of `schema.sql` into the editor
-4. Click **Run** to create all tables and functions
-
-#### Get Your API Keys
-1. Go to **Settings** > **API** in your Supabase dashboard
-2. Copy your **Project URL** and **anon/public key**
-
-### 3. Environment Configuration
-```bash
-# Copy the example environment file
-cp .env.example .env.local
-
-# Edit .env.local and add your Supabase credentials:
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-```
-
-### 4. Start Development Server
+### 2. Run the Development Server
 ```bash
 npm run dev
 ```
 
-Visit `http://localhost:3000` to see your QR Builder in action! 🎉
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## 📊 Database Schema
-
-### Tables Created:
-- **`qr_codes`**: Stores generated QR codes with metadata
-- **`qr_templates`**: Pre-configured templates for quick generation
-- **`qr_analytics`**: Tracks QR code scans and usage statistics
-
-### Key Features:
-- UUID primary keys
-- JSONB fields for flexible data storage
-- Automatic timestamps
-- Performance indexes
-- Built-in functions for analytics
-
-## 🎯 How to Use
-
-### Basic QR Generation
-1. Select QR type from the dropdown
-2. Fill in the required data
-3. Customize colors, size, and style
-4. Click **Generate QR Code**
-5. Download or copy your QR code
-
-### Google Maps QR Codes (Cross-Platform)
-1. Select **Location / Maps** type
-2. **Simply paste** any Google Maps link (long or short)
-3. QR code generates **automatically** - no button needed!
-4. **Opens in user's preferred maps app**:
-   - ✅ iOS: Apple Maps, Google Maps, Waze, or default
-   - ✅ Android: Google Maps, Waze, or default
-   - ✅ Desktop: Maps app or browser
-   - ✅ Works offline with downloaded maps
-   - ✅ Better privacy (uses universal geo: URI standard)
-
-**Supported formats:**
-- Full URLs: `https://www.google.com/maps/place/...`
-- Short links: `https://goo.gl/maps/abc123`
-- App links: `https://maps.app.goo.gl/xyz789`
-- Or manually enter coordinates/addresses
-
-**What gets generated:**
-- Universal `geo:` URI format (RFC 5870)
-- Example: `geo:28.6139,77.2090?q=India Gate`
-- Works with **any** maps application!
-
-### Quick Templates
-- Click any template button in the right sidebar
-- Form will auto-populate with template data
-- Customize and generate immediately
-
-### Batch Generation
-1. Prepare a CSV file with format: `type,content`
-   ```csv
-   URL,https://example.com
-   TEXT,Hello World
-   EMAIL,hello@example.com
-   ```
-2. Click the CSV upload area in **Batch Generator**
-3. Select your file
-4. QR codes will be generated automatically
-
-### Export Options
-- **PNG**: Standard download (right-click → Save)
-- **PDF**: Vector-perfect document export
-- **SVG**: Scalable vector graphics
-- **Analytics**: Export with usage statistics
-
-## 🔧 Advanced Customization
-
-### QR Code Styles
-- **Error Correction**: Higher levels = more damage resistance
-- **Gradients**: Linear and radial gradient support
-- **Patterns**: Choose from various dot and corner styles
-- **Logo Integration**: Add custom logos with size control
-
-### 3D Scene Customization
-Modify `src/components/QRCube3D.tsx` to:
-- Change particle count and behavior
-- Adjust floating geometry types
-- Modify lighting and materials
-- Add new 3D elements
-
-## 📱 Responsive Design
-
-The application is fully responsive with:
-- **Desktop**: Full 3-column layout with all features
-- **Tablet**: Adapted layout with stacked elements
-- **Mobile**: Optimized single-column view
-
-
-## 🛠️ Tech Stack
-
-### Frontend
-- **Next.js 15** with Turbopack
-- **React 18** with TypeScript
-- **Tailwind CSS** for styling
-- **Framer Motion** for animations
-
-### 3D Graphics
-- **Three.js** for 3D rendering
-- **@react-three/fiber** for React integration
-- **@react-three/drei** for utilities
-
-### Database & Backend
-- **Supabase** for database and real-time features
-- **PostgreSQL** with JSONB support
-- **Row Level Security** ready
-
-### QR & Export
-- **qrcode** library for QR generation
-- **jsPDF** for PDF export
-- **Canvas API** for image manipulation
-
-## 🔒 Security Notes
-
-- All QR generation happens client-side
-- Database stores only metadata (no sensitive data)
-- Environment variables are public (frontend-only)
-- Enable RLS in Supabase for user-specific data
-
-## 📈 Future Enhancements
-
-- [ ] User authentication with Supabase Auth
-- [ ] Real-time QR scan analytics
-- [ ] QR code expiration and access control
-- [ ] Team collaboration features
-- [ ] API endpoint for external integrations
-- [ ] Advanced analytics dashboard
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-MIT License - feel free to use this project for personal or commercial purposes.
-
-## 🆘 Support
-
-Having issues? Check:
-1. Supabase project is active and accessible
-2. Environment variables are correctly set
-3. Database schema was applied successfully
-4. Browser console for any errors
-
-For more help, create an issue in the repository.
+### 3. Production Build
+```bash
+npm run build
+npm run start
+```
 
 ---
 
-**Built with ❤️ by Shubham Mukherjee**
+## 🏗️ Project Architecture
+
+```
+qr-builder/
+├── public/                 # Static assets and icons
+├── src/
+│   ├── app/
+│   │   ├── globals.css     # Tailwind CSS v4, maximalist tokens & shadows
+│   │   ├── layout.tsx      # Root layout, Geist & Caveat font configurations
+│   │   └── page.tsx        # Homepage, hero collage, use cases, templates
+│   ├── components/
+│   │   ├── CollageDecorations.tsx # Monstera leaves, palm fronds, stamps, doodles
+│   │   └── QRBuilder.tsx   # Live studio workbench & responsive export controls
+│   ├── lib/
+│   │   ├── qr-presets.ts   # Preset styles & templates
+│   │   ├── qr-renderer.ts  # HTML5 Canvas QR rendering engine
+│   │   └── supabase.ts     # Supabase client configuration
+│   └── types/
+│       └── index.ts        # TypeScript definitions for QR types & styles
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+---
+
+## 🛠️ Tech Stack
+
+- **Framework**: [Next.js 16](https://nextjs.org/) with Turbopack compiler
+- **UI Library**: [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
+- **Animations**: [Framer Motion](https://www.framer.com/motion/)
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **Typography**: [Geist](https://vercel.com/font) & [Caveat](https://fonts.google.com/specimen/Caveat) via `next/font`
+- **QR Generation**: [qrcode](https://www.npmjs.com/package/qrcode)
+- **PDF Export**: [jsPDF](https://www.npmjs.com/package/jspdf)
+- **Backend Ready**: [Supabase](https://supabase.com/) client integration
+
+---
+
+## 🔒 Privacy & Security
+
+- **100% Client-Side Generation**: QR code matrix calculations and canvas rendering happen entirely inside the browser.
+- **No Tracking / No Intermediaries**: Generated URLs point directly to your destination with no middleman tracking redirects.
+- **No Watermarks**: Your exported files are clean and unrestricted for both personal and commercial use.
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE) — feel free to use it for personal or commercial projects.
+
+---
+
+<p align="center">
+  Built with ❤️ by <strong>Shubham Mukherjee</strong>
+</p>
