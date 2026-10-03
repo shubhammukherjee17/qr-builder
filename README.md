@@ -49,7 +49,7 @@ A modern, feature-rich QR code generator with stunning 3D animations, extensive 
 
 ### 1. Clone and Install
 ```bash
-git clone <your-repo>
+git clone https://github.com/shubhammukherjee17/qr-builder.git
 cd qr-builder
 npm install
 ```
